@@ -1,0 +1,20 @@
+# บังคับ LF ทุก text file — ป้องกัน mixed line endings ข้าม OS
+* text=auto eol=lf
+
+# ไฟล์ binary ที่ไม่ควรแปลง
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.mp3 binary
+*.mp4 binary
+*.zip binary
+*.tar.gz binary
+*.bin binary
+*.hex binary
+*.elf binary

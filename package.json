@@ -1,0 +1,131 @@
+{
+  "name": "fallhelp",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "npm@11.14.1",
+  "workspaces": [
+    "apps/backend-api",
+    "apps/mobile",
+    "apps/admin"
+  ],
+  "scripts": {
+    "postinstall": "node node_modules/patch-package/index.js && node scripts/dev/platform-install.mjs stamp root && node scripts/dev/fix-eslint-brace-expansion.mjs",
+    "install:all": "node scripts/dev/install-all.mjs",
+    "platform:check": "node scripts/dev/platform-install.mjs check",
+    "env:setup": "node scripts/env/setup-env.mjs",
+    "dev:all": "node scripts/dev/run-dev-suite.mjs",
+    "dev:backend-mobile": "node scripts/dev/run-dev-suite.mjs --no-admin",
+    "dev:backend-admin": "node scripts/dev/run-dev-suite.mjs --no-mobile",
+    "dev:stop": "npx kill-port 3000 8081 5173 5174 --silent",
+    "nx": "nx",
+    "nx:show": "nx show projects",
+    "nx:graph": "nx graph",
+    "nx:reset": "nx reset",
+    "build:all": "nx run-many -t build",
+    "test:all": "nx run-many -t test",
+    "lint:all": "nx run-many -t lint",
+    "typecheck:all": "nx run-many -t typecheck",
+    "affected:build": "nx affected -t build",
+    "affected:lint": "nx affected -t lint",
+    "affected:test": "nx affected -t test",
+    "affected:typecheck": "nx affected -t typecheck",
+    "infra:scan": "node scripts/audit/infra-scan.mjs",
+    "infra:scan:strict": "node scripts/audit/infra-scan.mjs --strict",
+    "infra:scan:strict:no-integration": "node scripts/audit/infra-scan.mjs --strict --no-integration",
+    "audit:instructions": "nx audit-instructions backend-api",
+    "audit:instructions:drift": "node scripts/audit/audit-instruction-drift.mjs",
+    "audit:comments:strict": "node scripts/audit/audit-comments.mjs --strict",
+    "docs:lint": "markdownlint-cli2",
+    "docs:lint:fix": "markdownlint-cli2 --fix",
+    "backend:dev": "node scripts/dev/platform-install.mjs check backend && npm run dev --prefix apps/backend-api",
+    "backend:debug": "node scripts/dev/platform-install.mjs check backend && npm run debug --prefix apps/backend-api",
+    "backend:build": "node scripts/dev/platform-install.mjs check backend --profile=backend-build && npm run build --prefix apps/backend-api",
+    "backend:start": "node scripts/dev/platform-install.mjs check backend && npm run start --prefix apps/backend-api",
+    "backend:db:setup": "node scripts/dev/platform-install.mjs check backend && npm run db:setup --prefix apps/backend-api",
+    "backend:db:reset": "node scripts/dev/platform-install.mjs check backend && npm run db:reset --prefix apps/backend-api",
+    "backend:db:verify": "node scripts/dev/platform-install.mjs check backend && npm run db:verify --prefix apps/backend-api",
+    "backend:db:test:setup": "node scripts/dev/platform-install.mjs check backend && npm run db:test:setup --prefix apps/backend-api",
+    "backend:db:test:reset": "node scripts/dev/platform-install.mjs check backend && npm run db:test:reset --prefix apps/backend-api",
+    "backend:test:integration": "node scripts/dev/platform-install.mjs check backend && npm run test:integration --prefix apps/backend-api",
+    "backend:test:integration:raw": "node scripts/dev/platform-install.mjs check backend && npm run test:integration:raw --prefix apps/backend-api",
+    "mobile:start": "node scripts/dev/platform-install.mjs check mobile && npm run start --prefix apps/mobile",
+    "mobile:android": "node scripts/dev/platform-install.mjs check mobile && npm run android --prefix apps/mobile",
+    "mobile:ios": "node scripts/dev/platform-install.mjs check mobile && npm run ios --prefix apps/mobile",
+    "admin:dev": "node scripts/dev/platform-install.mjs check admin && npm run dev --prefix apps/admin",
+    "admin:build": "node scripts/dev/platform-install.mjs check admin && npm run build --prefix apps/admin",
+    "admin:preview": "node scripts/dev/platform-install.mjs check admin && npm run preview --prefix apps/admin",
+    "iot:sim-fall": "npm run sim:fall --prefix apps/backend-api",
+    "mqtt:check": "node scripts/iot/mqtt-check.mjs",
+    "mqtt:monitor": "node scripts/iot/mqtt-monitor.mjs",
+    "mqtt:monitor:local": "node scripts/iot/mqtt-monitor.mjs --broker mqtt://localhost:1883",
+    "sensor-lab": "node firmware/esp32/fall_detection_sensor_lab/scripts/sensor_lab.mjs",
+    "sensor-lab:validate": "npm run sensor-lab -- validate",
+    "sensor-lab:summarize": "npm run sensor-lab -- summarize",
+    "sensor-lab:chapters": "npm run sensor-lab -- chapters",
+    "sensor-lab:all": "npm run sensor-lab -- all",
+    "sensor-lab:test": "npm run sensor-lab -- test",
+    "sensor-lab:node-red": "npm run sensor-lab -- node-red"
+  },
+  "devDependencies": {
+    "@flowfuse/node-red-dashboard": "^1.30.2",
+    "concurrently": "^9.1.0",
+    "expo": "~55.0.26",
+    "expo-router": "~55.0.16",
+    "kill-port": "^2.0.1",
+    "markdownlint-cli2": "^0.21.0",
+    "node-red": "^4.1.8",
+    "nx": "22.6.3",
+    "patch-package": "^8.0.1",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-native-reanimated": "4.2.1",
+    "react-test-renderer": "19.2.0",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "mqtt": "^5.15.0"
+  },
+  "overrides": {
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-test-renderer": "19.2.0",
+    "react-native-reanimated": "4.2.1",
+    "handlebars": "4.7.9",
+    "hono": "^4.12.18",
+    "lodash": "4.18.1",
+    "defu": "^6.1.7",
+    "express@5": {
+      "path-to-regexp": "^8.4.2"
+    },
+    "effect": "^3.21.2",
+    "prisma": "^7.8.0",
+    "@eslint/eslintrc": {
+      "minimatch": {
+        "brace-expansion": "^1.1.12"
+      }
+    },
+    "@eslint/config-array": {
+      "minimatch": {
+        "brace-expansion": "^1.1.12"
+      }
+    },
+    "minimatch@5.1.9": {
+      "brace-expansion": "^2.0.2"
+    },
+    "minimatch@9.0.9": {
+      "brace-expansion": "^2.0.2"
+    },
+    "minimatch@10.2.4": {
+      "brace-expansion": "^5.0.6"
+    },
+    "valibot": "^1.1.1",
+    "axios": "^1.16.0",
+    "vite": "^7.3.2",
+    "postcss": "^8.5.14",
+    "@xmldom/xmldom": "0.9.10",
+    "@hono/node-server": "1.19.13",
+    "@tootallnate/once": "3.0.1",
+    "fast-uri": "3.1.2"
+  }
+}

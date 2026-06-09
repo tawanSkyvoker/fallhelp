@@ -1,0 +1,29 @@
+{
+  "$schema": "https://unpkg.com/knip/schema.json",
+  "entry": ["app/**/_layout.tsx", "app/**/index.tsx", "app/**/*.tsx"],
+  "project": [
+    "app/**/*.{ts,tsx}",
+    "components/**/*.{ts,tsx}",
+    "context/**/*.{ts,tsx}",
+    "hooks/**/*.{ts,tsx}",
+    "store/**/*.{ts,tsx}",
+    "services/**/*.{ts,tsx}",
+    "utils/**/*.{ts,tsx}",
+    "constants/**/*.{ts,tsx}"
+  ],
+  "ignoreDependencies": [
+    "expo-splash-screen",
+    "@react-navigation/native-stack",
+    "@typescript-eslint/eslint-plugin",
+    "@typescript-eslint/parser",
+    "eslint-config-expo",
+    "eslint-config-prettier",
+    "eslint-plugin-prettier",
+    "eslint-plugin-unused-imports",
+    "patch-package",
+    "@expo/ngrok",
+    "@expo/vector-icons",
+    "expo-updates"
+  ],
+  "ignoreExportsUsedInFile": true
+}

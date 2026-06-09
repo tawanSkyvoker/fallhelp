@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Kanit font utility - use with className="font-kanit" */
+@layer utilities {
+  .font-kanit {
+    font-family:
+      'Kanit-Regular',
+      'Kanit-Medium',
+      'Kanit-Bold',
+      system-ui,
+      -apple-system,
+      sans-serif;
+  }
+}

@@ -1,0 +1,223 @@
+// ฐานข้อมูล FallHelp - PostgreSQL ด้วย Prisma ORM
+// จัดเก็บข้อมูลผู้ใช้, ผู้สูงอายุ, อุปกรณ์, เหตุการณ์, การแจ้งเตือน
+// Flow: Users → Elders → Devices → Events → Notifications
+
+// ชั้นที่ 1: Prisma runtime config
+// - generator = วิธี generate Prisma Client
+// - datasource = แหล่งข้อมูลจริง (DB provider/schema)
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["public"]
+}
+
+// ==================== USER & AUTHENTICATION ====================
+
+// ชั้นที่ 2: Model = โครงสร้างข้อมูลหลักของระบบ
+// ภายใน model ใช้ลำดับอ่านง่ายแบบเดียวกัน:
+// 1) Identity/PK
+// 2) Business fields
+// 3) Timestamps
+// 4) FK scalar + relation
+// 5) Relation arrays
+// 6) ตารางระดับล่าง (@@index, @@map, @@schema)
+model User {
+  // 1) Identity/PK
+  id String @id @default(uuid()) // รหัสผู้ใช้
+
+  // 2) Business fields
+  email        String   @unique // อีเมลสำหรับล็อกอิน
+  password     String // รหัสผ่านแบบ hash
+  firstName    String // ชื่อ
+  lastName     String // นามสกุล
+  gender       String? // เพศ (จำกัดค่าที่ backend validation: MALE/FEMALE/OTHER)
+  phone        String?  @unique // เบอร์โทรศัพท์ (ไม่ซ้ำกัน)
+  profileImage String? // รูปโปรไฟล์
+  pushToken    String? // Expo Push Token สำหรับแจ้งเตือน
+  role         String   @default("CAREGIVER") // บทบาท (จำกัดค่าที่ backend validation: ADMIN/CAREGIVER)
+
+  // 5) Relations - ความสัมพันธ์กับตารางอื่น
+  elder         Elder? // ผู้สูงอายุที่ดูแล (1:1)
+  notifications Notification[] // การแจ้งเตือน
+  authOtps      AuthOtp[] // OTP สำหรับรีเซ็ตรหัสผ่าน
+  // 6) Table-level constraints / mapping
+  @@map("users")
+  @@schema("public")
+}
+
+model AuthOtp {
+  // 1) Identity/PK
+  id String @id @default(uuid()) // รหัส OTP record
+
+  // 2) Business fields
+  code      String // รหัส OTP
+  expiresAt DateTime // เวลาหมดอายุของ OTP
+
+  // 3) Timestamps
+  createdAt DateTime @default(now()) // วันที่สร้าง OTP
+
+  // 4) FK scalar + relation
+  userId String // FK ไปยังผู้ใช้เจ้าของ OTP
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 6) Table-level constraints / mapping
+  @@index([userId, expiresAt])
+  @@map("auth_otps")
+  @@schema("public")
+}
+
+// ==================== ELDER & DEVICE ====================
+
+model Elder {
+  // 1) Identity/PK
+  id String @id @default(uuid()) // รหัสผู้สูงอายุ
+
+  // 2) Business fields
+  firstName   String // ชื่อ
+  lastName    String // นามสกุล
+  gender      String? // เพศ (จำกัดค่าที่ backend validation: MALE/FEMALE/OTHER)
+  dateOfBirth DateTime? @db.Date // วันเดือนปีเกิด (เก็บเฉพาะวันที่)
+  height      Int? // ส่วนสูง (cm)
+  weight      Float? // น้ำหนัก (kg)
+  diseases    String? // โรคประจำตัว (free-text note เดี่ยว ไม่ใช่ array)
+  phone       String? // เบอร์โทรผู้สูงอายุ (ไม่บังคับ)
+
+  // ที่อยู่แบบแยกฟิลด์
+  houseNumber String? // บ้านเลขที่
+  villageNumber String? // หมู่ที่
+  villageName   String? // ชื่อหมู่บ้าน/ชุมชน/อาคาร
+  subdistrict String? // ตำบล/แขวง
+  district    String? // อำเภอ/เขต
+  province    String? // จังหวัด
+  zipcode     String? // รหัสไปรษณีย์
+
+  // 4) FK scalar + relation
+  userId String @unique // FK ผู้ดูแล (Single-Caregiver)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 5) Relations
+  device            Device? // อุปกรณ์ที่ผูกกับผู้สูงอายุ
+  emergencyContacts EmergencyContact[] // รายชื่อผู้ติดต่อฉุกเฉิน
+  events            Event[] // ประวัติเหตุการณ์
+
+  // 6) Table-level constraints / mapping
+  @@map("elders")
+  @@schema("public")
+}
+
+model Device {
+  // 1) Identity/PK
+  id String @id @default(uuid()) // รหัสอุปกรณ์
+
+  // 2) Business fields
+  deviceCode   String       @unique // รหัสอุปกรณ์สำหรับ QR Code
+  serialNumber String       @unique // หมายเลขซีเรียลจากโรงงาน
+  status       String   @default("UNPAIRED") // สถานะการผูกอุปกรณ์ (PAIRED/UNPAIRED)
+  wifiStatus   String   @default("DISCONNECTED") // สถานะ WiFi ล่าสุด (CONNECTED/DISCONNECTED/CONFIGURING/ERROR)
+  lastOnline   DateTime? // เวลาออนไลน์ล่าสุดจากการ ping
+
+  // 3) Timestamps
+  updatedAt DateTime @updatedAt // วันที่แก้ไขล่าสุด (ใช้ตรวจ stale WiFi config)
+
+  // 4) FK scalar + relation
+  elderId String? @unique // FK ผู้สูงอายุที่ผูกอุปกรณ์นี้
+  elder   Elder?  @relation(fields: [elderId], references: [id], onDelete: SetNull)
+
+  // 5) Relations
+  events    Event[] // เหตุการณ์ที่มาจากอุปกรณ์นี้
+  // 6) Table-level constraints / mapping
+  @@map("devices")
+  @@schema("public")
+}
+
+// ==================== EMERGENCY CONTACTS ====================
+
+model EmergencyContact {
+  // 1) Identity/PK
+  id String @id @default(uuid()) // รหัสผู้ติดต่อฉุกเฉิน
+
+  // 2) Business fields
+  name         String // ชื่อผู้ติดต่อ
+  phone        String // เบอร์โทรผู้ติดต่อ
+  relationship String? // เช่น "ลูก", "หลาน", "เพื่อนบ้าน"
+  priority     Int // 1 = สำคัญที่สุด, 2 = รอง, ...
+
+  // 4) FK scalar + relation
+  elderId String // FK ผู้สูงอายุเจ้าของ contact
+  elder   Elder  @relation(fields: [elderId], references: [id], onDelete: Cascade)
+
+  // 6) Table-level constraints / mapping
+  @@unique([elderId, priority]) // ห้ามมี priority ซ้ำในคนเดียวกัน
+  @@map("emergency_contacts")
+  @@schema("public")
+}
+
+// ==================== EVENTS ====================
+
+model Event {
+  // 1) Identity/PK
+  id String @id @default(uuid()) // รหัสเหตุการณ์
+
+  // 2) Business fields
+  // fallStage = lifecycle ของ FALL event: PENDING_CONFIRMATION | CONFIRMED | CANCELLED
+  // severity ถูกถอดออกแล้ว — derive จาก fallStage ได้ใน service/controller (CONFIRMED → CRITICAL, PENDING_CONFIRMATION → WARNING)
+  // type ถูกถอดออกแล้ว — ระบบปัจจุบันมีแต่ FALL ดังนั้น fallStage เป็น source of truth แทน
+  fallStage    String   // PENDING_CONFIRMATION | CONFIRMED | CANCELLED
+  bpm          Int?     // ค่า BPM ณ ขณะล้ม (null ถ้าไม่มีข้อมูล)
+  magnitude    Float?   // ขนาดแรงกระแทก (จาก accelerometer)
+  postureDelta Float?   // การเปลี่ยนแปลงท่าทาง (องศา)
+  cancelledAt  DateTime? // ถ้ามีค่า แปลว่า false alarm ถูกยกเลิกจากปุ่มบนอุปกรณ์แล้ว
+
+  // 3) Timestamps
+  timestamp DateTime @default(now()) // เวลาเกิดเหตุที่ใช้ทำ partition/index
+
+  // 4) FK scalar + relation
+  elderId  String // FK ผู้สูงอายุที่เกี่ยวข้อง
+  deviceId String // FK อุปกรณ์ที่ส่งเหตุการณ์
+  elder         Elder        @relation(fields: [elderId], references: [id], onDelete: Cascade)
+  device        Device       @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  // 5) Relations
+  notifications Notification[] // การแจ้งเตือนที่อ้างอิงเหตุการณ์นี้
+
+  // 6) Table-level constraints / mapping
+  @@index([elderId, timestamp(sort: Desc)])
+  @@index([deviceId, timestamp(sort: Desc)])
+  @@index([deviceId, fallStage, cancelledAt, timestamp(sort: Desc)])
+  @@index([fallStage, timestamp(sort: Desc)])
+  @@index([timestamp(sort: Desc)])
+  @@map("events")
+  @@schema("public")
+}
+
+// ==================== NOTIFICATIONS ====================
+
+model Notification {
+  // 1) Identity/PK
+  id String @id @default(uuid()) // รหัสการแจ้งเตือน
+
+  // 2) Business fields
+  title   String // หัวข้อแจ้งเตือน
+  message String // รายละเอียดข้อความแจ้งเตือน
+  isRead  Boolean          @default(false) // สถานะว่าอ่านแล้วหรือยัง
+  readAt  DateTime? // เวลาอ่านแจ้งเตือน
+
+  // 3) Timestamps
+  createdAt DateTime @default(now()) // วันที่สร้างแจ้งเตือน
+
+  // 4) FK scalar + relation
+  userId  String // FK ผู้ใช้ปลายทางของแจ้งเตือน
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventId String // FK ไปยัง Event ต้นทางของการแจ้งเตือน
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  // 6) Table-level constraints / mapping
+  @@index([userId, isRead, createdAt(sort: Desc)])
+  @@index([eventId])
+  @@map("notifications")
+  @@schema("public")
+}

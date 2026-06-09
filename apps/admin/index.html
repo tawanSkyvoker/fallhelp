@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      (function () {
+        try {
+          var savedTheme = localStorage.getItem("theme");
+          var useDark =
+            savedTheme === "dark" ||
+            (!savedTheme && window.matchMedia("(prefers-color-scheme: dark)").matches);
+
+          if (useDark) {
+            document.documentElement.classList.add("dark");
+            document.documentElement.style.backgroundColor = "#111827";
+            document.documentElement.style.color = "#f9fafb";
+          } else {
+            document.documentElement.classList.remove("dark");
+            document.documentElement.style.backgroundColor = "#f9fafb";
+            document.documentElement.style.color = "#111827";
+          }
+        } catch (_) {
+          document.documentElement.style.backgroundColor = "#f9fafb";
+          document.documentElement.style.color = "#111827";
+        }
+      })();
+    </script>
+  </head>
+  <body
+    class="bg-gray-50 text-gray-900 font-kanit"
+    style="margin: 0; background-color: inherit; color: inherit"
+  >
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

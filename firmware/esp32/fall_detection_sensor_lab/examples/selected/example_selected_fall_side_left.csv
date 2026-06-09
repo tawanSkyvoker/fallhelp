@@ -1,0 +1,2 @@
+session_id,trial_id,activity_label,expected_type,svm_filtered_g,impact_threshold_g,pitch_before_deg,roll_before_deg,pitch_after_deg,roll_after_deg,pitch_delta_deg,roll_delta_deg,posture_delta_deg,posture_threshold_deg,decision,summary
+S01,T05,side_fall_left,fall,2.31,2.0,7.5,4.8,19.2,63.0,11.7,58.2,58.2,45,suspected_fall,แรงกระแทกและ postureDelta ผ่าน threshold ระบบจึงตรวจพบการล้ม

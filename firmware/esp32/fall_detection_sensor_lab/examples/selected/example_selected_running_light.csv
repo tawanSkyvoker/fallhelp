@@ -1,0 +1,2 @@
+session_id,trial_id,activity_label,expected_type,svm_filtered_g,impact_threshold_g,pitch_before_deg,roll_before_deg,pitch_after_deg,roll_after_deg,pitch_delta_deg,roll_delta_deg,posture_delta_deg,posture_threshold_deg,decision,summary
+S01,T03,running_light,non_fall,1.85,2.0,,,,,14.0,0.0,14.0,45,ignored,มีการเคลื่อนไหวต่อเนื่องแต่ไม่เข้าเงื่อนไขการล้ม

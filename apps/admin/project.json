@@ -1,0 +1,66 @@
+{
+  "name": "admin",
+  "projectType": "application",
+  "sourceRoot": "apps/admin/src",
+  "implicitDependencies": ["backend-api"],
+  "tags": ["scope:admin", "type:app", "runtime:web"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-script",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "script": "build"
+      },
+      "metadata": {
+        "description": "Build the admin dashboard"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "typecheck"
+      },
+      "metadata": {
+        "description": "Typecheck the admin dashboard"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "lint"
+      },
+      "metadata": {
+        "description": "Lint the admin dashboard"
+      }
+    },
+    "test": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "test"
+      },
+      "metadata": {
+        "description": "Run admin tests"
+      }
+    },
+    "dev": {
+      "executor": "nx:run-script",
+      "continuous": true,
+      "options": {
+        "script": "dev"
+      },
+      "metadata": {
+        "description": "Start admin Vite dev server"
+      }
+    },
+    "preview": {
+      "executor": "nx:run-script",
+      "continuous": true,
+      "options": {
+        "script": "preview"
+      },
+      "metadata": {
+        "description": "Preview the admin production build"
+      }
+    }
+  }
+}

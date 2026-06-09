@@ -1,0 +1,28 @@
+# Expo
+.expo/
+.expo-shared/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+/ios
+/android
+.kotlin/
+.metro-health-check*
+
+# Signing / keys
+*.jks
+*.keystore
+*.p8
+*.p12
+*.keyตั้งให้เหมาะสม
+*.mobileprovision
+*.apk
+
+# Firebase
+google-services.json
+GoogleService-Info.plist
+
+# Environment — keep example template in git
+!.env.example

@@ -1,0 +1,62 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "workspaceLayout": {
+    "appsDir": "apps",
+    "libsDir": "packages"
+  },
+  "pluginsConfig": {
+    "@nx/js": {
+      "analyzeLockfile": false,
+      "analyzePackageJson": true,
+      "analyzeSourceFiles": false,
+      "projectsAffectedByDependencyUpdates": "auto"
+    }
+  },
+  "namedInputs": {
+    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "production": [
+      "default",
+      "!{projectRoot}/**/*.test.*",
+      "!{projectRoot}/__tests__/**",
+      "!{projectRoot}/coverage/**",
+      "!{projectRoot}/jest.config.*",
+      "!{projectRoot}/jest.light.config.*",
+      "!{projectRoot}/jest.integration.config.*"
+    ],
+    "sharedGlobals": [
+      "{workspaceRoot}/package.json",
+      "{workspaceRoot}/package-lock.json",
+      "{workspaceRoot}/.npmrc",
+      "{workspaceRoot}/AGENTS.md"
+    ]
+  },
+  "targetDefaults": {
+    "build": {
+      "dependsOn": ["^build"],
+      "cache": true,
+      "inputs": ["production", "^production"]
+    },
+    "lint": {
+      "cache": true,
+      "inputs": ["default", "^default"]
+    },
+    "typecheck": {
+      "cache": true,
+      "inputs": ["default", "^default"]
+    },
+    "test": {
+      "cache": true,
+      "inputs": ["default", "^default"]
+    },
+    "test-light": {
+      "cache": true,
+      "inputs": ["default", "^default"]
+    },
+    "test-integration": {
+      "cache": true,
+      "inputs": ["default", "^default"]
+    }
+  },
+  "analytics": true,
+  "nxCloudId": "6a25d442d5a7fc875eb9e4d4"
+}

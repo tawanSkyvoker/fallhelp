@@ -1,0 +1,26 @@
+{
+  "extraKnownMarketplaces": {
+    "nx-claude-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "nrwl/nx-ai-agents-config"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "nx@nx-claude-plugins": true
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v bun >/dev/null 2>&1 || (curl -fsSL https://bun.sh/install | bash && export PATH=$HOME/.bun/bin:$PATH) && ~/.claude/package/index.js"
+          }
+        ]
+      }
+    ]
+  }
+}

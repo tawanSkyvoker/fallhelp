@@ -1,0 +1,6 @@
+{
+  "$schema": "https://unpkg.com/knip/schema.json",
+  "project": ["src/**/*.{ts,tsx}", "!src/__tests__/**"],
+  "ignoreDependencies": ["postcss"],
+  "ignoreExportsUsedInFile": true
+}

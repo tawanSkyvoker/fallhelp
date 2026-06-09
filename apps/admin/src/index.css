@@ -1,0 +1,166 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-kanit: "Kanit", sans-serif;
+  --font-sans:
+    "Kanit", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --color-primary: #16ad78;
+  --color-secondary: #3b82f6;
+}
+
+@layer utilities {
+  .font-kanit {
+    font-family: var(--font-kanit);
+  }
+}
+
+@layer components {
+  .admin-page-shell {
+    @apply min-h-screen bg-gray-50 p-4 dark:bg-gray-900 sm:p-6;
+  }
+
+  .admin-page-container {
+    @apply mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 space-y-6;
+  }
+
+  .admin-page-title {
+    @apply text-2xl leading-tight font-bold text-gray-900 dark:text-white sm:text-[1.75rem];
+  }
+
+  .admin-page-subtitle {
+    @apply mt-1 text-sm text-gray-500 dark:text-gray-400;
+  }
+
+  .admin-section-title {
+    @apply text-lg font-semibold text-gray-900 dark:text-white;
+  }
+
+  .admin-kpi-card {
+    @apply rounded-lg border border-gray-200/80 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:border-gray-700 dark:bg-gray-800;
+  }
+
+  .admin-kpi-label {
+    @apply mb-0.5 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500;
+  }
+
+  .admin-kpi-value {
+    @apply text-[2rem] leading-none font-bold text-gray-900 dark:text-white;
+  }
+
+  .admin-table-head {
+    @apply px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300;
+  }
+
+  .admin-sidebar-title {
+    @apply text-xl font-bold text-primary font-kanit;
+  }
+
+  .admin-sidebar-meta {
+    @apply text-xs text-gray-500 dark:text-gray-400;
+  }
+
+  .admin-sidebar-link {
+    @apply text-[15px] font-medium;
+  }
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+/* Hide native password reveal button in Edge/Internet Explorer */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
+.device-label-sheet {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .device-label-sheet,
+  .device-label-sheet * {
+    visibility: visible;
+  }
+
+  .device-label-sheet {
+    display: grid !important;
+    position: absolute;
+    inset: 0;
+    grid-template-columns: repeat(3, 46mm);
+    grid-auto-rows: 33mm;
+    column-gap: 5mm;
+    row-gap: 5mm;
+    justify-content: center;
+    align-content: start;
+    color: #111827;
+  }
+
+  .device-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2.5mm 3mm; /* ระยะห่างซ้ายขวาสมมาตรเท่ากัน 3mm */
+    border: 0.3mm dashed #475569; /* เส้นประ */
+    border-radius: 0; /* มุมไม่มน เป็นมุมฉากตามคำขอ */
+    overflow: hidden;
+    box-sizing: border-box;
+    width: 46mm;
+    height: 33mm;
+  }
+
+  .device-label__name {
+    font-size: 5pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    margin-bottom: 0.5mm;
+    color: #334155;
+  }
+
+  .device-label__qr svg {
+    width: 14mm !important;
+    height: 14mm !important;
+    display: block;
+  }
+
+  .device-label__code {
+    font-family: "Courier New", monospace;
+    max-width: 100%;
+    margin-top: 0.5mm;
+    overflow: hidden;
+    font-size: 6.5pt;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    line-height: 1.1;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .device-label__serial {
+    font-family: "Courier New", monospace;
+    width: 100%;
+    overflow: visible;
+    font-size: 4.0pt; /* ปรับขนาดให้เป็น 4.0pt เพื่อให้กึ่งกลางสมบูรณ์แบบ ไม่ล้นหรือชิดขอบข้าง */
+    letter-spacing: 0.02em;
+    line-height: 1;
+    color: #475569;
+    text-align: center;
+    white-space: nowrap;
+    margin-top: 0.2mm;
+  }
+}

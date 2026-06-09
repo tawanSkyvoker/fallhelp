@@ -1,0 +1,4 @@
+session_id,trial_id,activity_label,expected_type,timestamp_ms,type,state,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps,svm_raw_g,svm_filtered_g,pitch_deg,roll_deg,pitch_before_deg,roll_before_deg,pitch_after_deg,roll_after_deg,pitch_delta_deg,roll_delta_deg,posture_delta_deg,impact_threshold_g,posture_threshold_deg,stabilize_ms,decision,note
+S01,T03,running_light,non_fall,1000,imu_sample,IDLE,0.40,0.32,1.20,2.5,1.8,0.6,1.31,1.25,7.1,5.2,,,,,,,,2.0,45,1500,pending,
+S01,T03,running_light,non_fall,1400,imu_sample,IDLE,0.62,0.50,1.45,3.2,2.1,0.8,1.65,1.58,8.5,6.0,,,,,,,,2.0,45,1500,pending,
+S01,T03,running_light,non_fall,1800,imu_sample,IDLE,0.75,0.61,1.52,3.8,2.6,1.0,1.80,1.85,9.0,6.8,,,,,,,,2.0,45,1500,ignored,light jogging

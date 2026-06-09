@@ -1,0 +1,68 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env*
+firmware/esp32/src/sensor_tuning/wifi_secrets.h
+firmware/esp32/src/main_firmware/mqtt_secrets.h
+
+# Logs
+*.log
+AGENT.log
+fallback.log
+
+# OS / Editor
+.DS_Store
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+.claude/settings.local.json
+
+# Antigravity workspace: keep project skill in Git, ignore local toolkit/state
+.agent/*
+!.agent/skills/
+.agent/skills/*
+!.agent/skills/fallhelp-fullstack-agent/
+!.agent/skills/fallhelp-fullstack-agent/**
+!.agent/skills/diagram-expert/
+!.agent/skills/diagram-expert/**
+!.agent/skills/testing-expert/
+!.agent/skills/testing-expert/**
+!.agent/skills/iot-firmware-expert/
+!.agent/skills/iot-firmware-expert/**
+!.agent/skills/fall-detection-sensor-lab/
+!.agent/skills/fall-detection-sensor-lab/**
+
+# Nx local cache / graph state
+.nx/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# TypeScript
+*.tsbuildinfo
+
+# Personal notes / tmp files
+bug-fix-errorProblems.txt
+*.txt
+!**/README.txt
+tmp/
+
+# Generated sensor-lab summaries
+arduino/sensor-lab/**/summary.md
+
+# Node-RED runtime userDir (Fall Detection Sensor Lab)
+firmware/esp32/fall_detection_sensor_lab/node-red/runtime/
+firmware/esp32/fall_detection_sensor_lab/node-red/legacy-runtime/
+
+# Sensor Lab raw data folders (only selected data is tracked)
+firmware/esp32/fall_detection_sensor_lab/runs/*/raw/
+
+.claude/worktrees
+

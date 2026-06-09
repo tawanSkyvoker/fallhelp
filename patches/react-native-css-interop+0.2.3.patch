@@ -1,0 +1,265 @@
+diff --git a/node_modules/react-native-css-interop/.cache/android.js b/node_modules/react-native-css-interop/.cache/android.js
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-css-interop/.cache/ios.js b/node_modules/react-native-css-interop/.cache/ios.js
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-css-interop/.cache/macos.js b/node_modules/react-native-css-interop/.cache/macos.js
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-css-interop/.cache/native.js b/node_modules/react-native-css-interop/.cache/native.js
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-css-interop/.cache/windows.js b/node_modules/react-native-css-interop/.cache/windows.js
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-css-interop/dist/metro/index.js b/node_modules/react-native-css-interop/dist/metro/index.js
+index c91ba6a..0c55619 100644
+--- a/node_modules/react-native-css-interop/dist/metro/index.js
++++ b/node_modules/react-native-css-interop/dist/metro/index.js
+@@ -16,6 +16,25 @@ let virtualModulesPossible = undefined;
+ const virtualModules = new Map();
+ const outputDirectory = path_1.default.resolve(__dirname, "../../.cache");
+ const isRadonIDE = "REACT_NATIVE_IDE_LIB_PATH" in process.env;
++function emitVirtualModuleChange(filePath) {
++    const rootDir = path_1.default.dirname(filePath);
++    const canonicalPath = path_1.default.basename(filePath);
++    const metadata = {
++        isSymlink: false,
++        modifiedTime: Date.now(),
++    };
++    haste.emit("change", {
++        changes: {
++            addedDirectories: new Set(),
++            removedDirectories: new Set(),
++            addedFiles: new Map(),
++            modifiedFiles: new Map([[canonicalPath, metadata]]),
++            removedFiles: new Map(),
++        },
++        logger: null,
++        rootDir,
++    });
++}
+ function withCssInterop(config, options) {
+     return typeof config === "function"
+         ? async function WithCSSInterop() {
+@@ -176,19 +195,7 @@ async function startCSSProcessor(filePath, platform, isDev, { input, getCSSForPl
+                 ? css
+                 : getNativeJS((0, css_to_rn_1.cssToReactNativeRuntime)(css, options), debug)));
+             debug(`virtualStyles.emit ${platform}`);
+-            haste.emit("change", {
+-                eventsQueue: [
+-                    {
+-                        filePath,
+-                        metadata: {
+-                            modifiedTime: Date.now(),
+-                            size: 1,
+-                            type: "virtual",
+-                        },
+-                        type: "change",
+-                    },
+-                ],
+-            });
++            emitVirtualModuleChange(filePath);
+         }).then((css) => {
+             debug(`virtualStyles.initial ${platform}`);
+             return platform === "web"
+diff --git a/node_modules/react-native-css-interop/dist/runtime/native/render-component.js b/node_modules/react-native-css-interop/dist/runtime/native/render-component.js
+index eba25ec..5a4f0f1 100644
+--- a/node_modules/react-native-css-interop/dist/runtime/native/render-component.js
++++ b/node_modules/react-native-css-interop/dist/runtime/native/render-component.js
+@@ -32,7 +32,7 @@ function renderComponent(baseComponent, state, props, possiblyAnimatedProps, var
+     if (state.pressable !== exports.UpgradeState.NONE) {
+         if (process.env.NODE_ENV !== "production") {
+             if (shouldWarn && state.pressable === exports.UpgradeState.SHOULD_UPGRADE) {
+-                printUpgradeWarning(`Converting View to Pressable should only happen during the initial render otherwise it will remount the View.\n\nTo prevent this warning avoid adding styles which use pseudo-classes (e.g :hover, :active, :focus) to View components after the initial render, or change the View to a Pressable`, state.originalProps);
++                printUpgradeWarning(`Converting View to Pressable should only happen during the initial render otherwise it will remount the View.\n\nTo prevent this warning avoid adding styles which use pseudo-classes (e.g :hover, :active, :focus) to View components after the initial render, or change the View to a Pressable`, state.originalProps, baseComponent);
+             }
+         }
+         component = react_native_1.Pressable;
+@@ -42,6 +42,6 @@ function renderComponent(baseComponent, state, props, possiblyAnimatedProps, var
+         if (shouldWarn && state.animated === exports.UpgradeState.SHOULD_UPGRADE) {
+             if (process.env.NODE_ENV !== "production") {
+-                printUpgradeWarning(`Components need to be animated during the initial render otherwise they will remount.\n\nTo prevent this warning avoid dynamically adding animation/transition styles to components after the initial render, or add a default style that sets "animation: none"/"transition-property: none"`, state.originalProps);
++                printUpgradeWarning(`Components need to be animated during the initial render otherwise they will remount.\n\nTo prevent this warning avoid dynamically adding animation/transition styles to components after the initial render, or add a default style that sets "animation: none"/"transition-property: none"`, state.originalProps, baseComponent);
+             }
+         }
+         else {
+@@ -78,7 +78,7 @@ function renderComponent(baseComponent, state, props, possiblyAnimatedProps, var
+     if (state.variables !== exports.UpgradeState.NONE) {
+         if (process.env.NODE_ENV !== "production") {
+             if (shouldWarn && state.variables === exports.UpgradeState.SHOULD_UPGRADE) {
+-                printUpgradeWarning(`Components need to set a variable during the initial render otherwise they will remount.\n\nTo prevent this warning avoid dynamically adding CSS variables components after the initial render, or ensure it has a default style that sets either a CSS variable`, state.originalProps);
++                printUpgradeWarning(`Components need to set a variable during the initial render otherwise they will remount.\n\nTo prevent this warning avoid dynamically adding CSS variables components after the initial render, or ensure it has a default style that sets either a CSS variable`, state.originalProps, baseComponent);
+             }
+         }
+         state.variables = exports.UpgradeState.UPGRADED;
+@@ -91,7 +91,7 @@ function renderComponent(baseComponent, state, props, possiblyAnimatedProps, var
+     if (state.containers !== exports.UpgradeState.NONE) {
+         if (process.env.NODE_ENV !== "production") {
+             if (shouldWarn && state.containers === exports.UpgradeState.SHOULD_UPGRADE) {
+-                printUpgradeWarning(`Components need to marked as a container during the initial render otherwise they will remount.\n\nTo prevent this warning avoid dynamically container styles to a component after the initial render, or ensure it has a default style that sets "container: none" or "container-type: none"`, state.originalProps);
++                printUpgradeWarning(`Components need to marked as a container during the initial render otherwise they will remount.\n\nTo prevent this warning avoid dynamically container styles to a component after the initial render, or ensure it has a default style that sets "container: none" or "container-type: none"`, state.originalProps, baseComponent);
+             }
+         }
+         state.containers = exports.UpgradeState.UPGRADED;
+@@ -118,7 +118,23 @@ function createAnimatedComponent(Component) {
+     return AnimatedComponent;
+ }
+-function printUpgradeWarning(warning, originalProps) {
+-    console.log(`CssInterop upgrade warning.\n\n${warning}.\n\nThis warning was caused by a component with the props:\n${stringify(originalProps)}\n\nIf adding or removing sibling components caused this warning you should add a unique "key" prop to your components. https://react.dev/learn/rendering-lists#keeping-list-items-in-order-with-key\n`);
++function printUpgradeWarning(warning, originalProps, component) {
++    const summary = getPropsSummary(originalProps, component);
++    try {
++        console.log(`CssInterop upgrade warning.\n\n${warning}.\n\n${summary}\n\nThis warning was caused by a component with the props:\n${stringify(originalProps)}\n\nIf adding or removing sibling components caused this warning you should add a unique "key" prop to your components. https://react.dev/learn/rendering-lists#keeping-list-items-in-order-with-key\n`);
++    } catch (e) {
++        console.log(`CssInterop upgrade warning.\n\n${warning}.\n\n${summary}\n\n(Props could not be serialized due to: ${e.message})\n`);
++    }
+ }
++function getPropsSummary(originalProps, component) {
++    const componentName = component?.displayName || component?.name || "Unknown";
++    const propKeys = originalProps && typeof originalProps === "object" ? Object.keys(originalProps).join(", ") : "";
++    const className = originalProps && typeof originalProps === "object" && "className" in originalProps
++        ? originalProps.className
++        : undefined;
++    const testID = originalProps && typeof originalProps === "object" && "testID" in originalProps
++        ? originalProps.testID
++        : undefined;
++    return `CssInterop props summary: component=${componentName}; className=${String(className)}; testID=${String(testID)}; propKeys=${propKeys}`;
++}
+ function stringify(object) {
+     const seen = new WeakSet();
+diff --git a/node_modules/react-native-css-interop/src/metro/index.ts b/node_modules/react-native-css-interop/src/metro/index.ts
+index fa58c7b..65f869c 100644
+--- a/node_modules/react-native-css-interop/src/metro/index.ts
++++ b/node_modules/react-native-css-interop/src/metro/index.ts
+@@ -79,6 +79,27 @@ const virtualModules = new Map<string, Promise<string | Buffer>>();
+ const outputDirectory = path.resolve(__dirname, "../../.cache");
+ const isRadonIDE = "REACT_NATIVE_IDE_LIB_PATH" in process.env;
+ 
++function emitVirtualModuleChange(filePath: string) {
++  const rootDir = path.dirname(filePath);
++  const canonicalPath = path.basename(filePath);
++  const metadata = {
++    isSymlink: false,
++    modifiedTime: Date.now(),
++  };
++
++  haste.emit("change", {
++    changes: {
++      addedDirectories: new Set(),
++      removedDirectories: new Set(),
++      addedFiles: new Map(),
++      modifiedFiles: new Map([[canonicalPath, metadata]]),
++      removedFiles: new Map(),
++    },
++    logger: null,
++    rootDir,
++  });
++}
++
+ export function withCssInterop(
+   config: MetroConfig,
+   options: WithCssInteropOptions,
+@@ -341,19 +362,7 @@ async function startCSSProcessor(
+         );
+ 
+         debug(`virtualStyles.emit ${platform}`);
+-        haste.emit("change", {
+-          eventsQueue: [
+-            {
+-              filePath,
+-              metadata: {
+-                modifiedTime: Date.now(),
+-                size: 1, // Can be anything
+-                type: "virtual", // Can be anything
+-              },
+-              type: "change",
+-            },
+-          ],
+-        });
++        emitVirtualModuleChange(filePath);
+       }).then((css) => {
+         debug(`virtualStyles.initial ${platform}`);
+         return platform === "web"
+diff --git a/node_modules/react-native-css-interop/src/runtime/native/render-component.tsx b/node_modules/react-native-css-interop/src/runtime/native/render-component.tsx
+index 09ec7aa..0fae117 100644
+--- a/node_modules/react-native-css-interop/src/runtime/native/render-component.tsx
++++ b/node_modules/react-native-css-interop/src/runtime/native/render-component.tsx
+@@ -56,6 +56,7 @@ export function renderComponent(
+         printUpgradeWarning(
+           `Converting View to Pressable should only happen during the initial render otherwise it will remount the View.\n\nTo prevent this warning avoid adding styles which use pseudo-classes (e.g :hover, :active, :focus) to View components after the initial render, or change the View to a Pressable`,
+           state.originalProps,
++          baseComponent,
+         );
+       }
+     }
+@@ -70,6 +71,7 @@ export function renderComponent(
+         printUpgradeWarning(
+           `Components need to be animated during the initial render otherwise they will remount.\n\nTo prevent this warning avoid dynamically adding animation/transition styles to components after the initial render, or add a default style that sets "animation: none"/"transition-property: none"`,
+           state.originalProps,
++          baseComponent,
+         );
+       }
+     } else {
+@@ -112,6 +114,7 @@ export function renderComponent(
+         printUpgradeWarning(
+           `Components need to set a variable during the initial render otherwise they will remount.\n\nTo prevent this warning avoid dynamically adding CSS variables components after the initial render, or ensure it has a default style that sets either a CSS variable`,
+           state.originalProps,
++          baseComponent,
+         );
+       }
+     }
+@@ -130,6 +133,7 @@ export function renderComponent(
+         printUpgradeWarning(
+           `Components need to marked as a container during the initial render otherwise they will remount.\n\nTo prevent this warning avoid dynamically container styles to a component after the initial render, or ensure it has a default style that sets "container: none" or "container-type: none"`,
+           state.originalProps,
++          baseComponent,
+         );
+       }
+     }
+@@ -228,10 +232,41 @@ function createAnimatedComponent(Component: ComponentType<any>): any {
+ function printUpgradeWarning(
+   warning: string,
+   originalProps: Record<string, any> | null | undefined,
++  component?: ComponentType<any>,
+ ) {
+-  console.log(
+-    `CssInterop upgrade warning.\n\n${warning}.\n\nThis warning was caused by a component with the props:\n${stringify(originalProps)}\n\nIf adding or removing sibling components caused this warning you should add a unique "key" prop to your components. https://react.dev/learn/rendering-lists#keeping-list-items-in-order-with-key\n`,
+-  );
++  const summary = getPropsSummary(originalProps, component);
++
++  try {
++    console.log(
++      `CssInterop upgrade warning.\n\n${warning}.\n\n${summary}\n\nThis warning was caused by a component with the props:\n${stringify(originalProps)}\n\nIf adding or removing sibling components caused this warning you should add a unique "key" prop to your components. https://react.dev/learn/rendering-lists#keeping-list-items-in-order-with-key\n`,
++    );
++  } catch (error: any) {
++    console.log(
++      `CssInterop upgrade warning.\n\n${warning}.\n\n${summary}\n\n(Props could not be serialized due to: ${error.message})\n`,
++    );
++  }
++}
++
++function getPropsSummary(
++  originalProps: Record<string, any> | null | undefined,
++  component?: ComponentType<any>,
++) {
++  const componentName =
++    component?.displayName || component?.name || "Unknown";
++  const propKeys =
++    originalProps && typeof originalProps === "object"
++      ? Object.keys(originalProps).join(", ")
++      : "";
++  const className =
++    originalProps && typeof originalProps === "object" && "className" in originalProps
++      ? originalProps.className
++      : undefined;
++  const testID =
++    originalProps && typeof originalProps === "object" && "testID" in originalProps
++      ? originalProps.testID
++      : undefined;
++
++  return `CssInterop props summary: component=${componentName}; className=${String(className)}; testID=${String(testID)}; propKeys=${propKeys}`;
+ }
+ 
+ function stringify(object: any) {

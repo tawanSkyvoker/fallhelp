@@ -1,0 +1,175 @@
+name: CI
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".npmrc"
+      - "package.json"
+      - "package-lock.json"
+      - "nx.json"
+      - ".dockerignore"
+      - "patches/**"
+      - "apps/backend-api/package.json"
+      - "apps/backend-api/package-lock.json"
+      - "apps/backend-api/**"
+      - "apps/mobile/package.json"
+      - "apps/mobile/package-lock.json"
+      - "apps/mobile/**"
+      - "apps/admin/package.json"
+      - "apps/admin/package-lock.json"
+      - "apps/admin/**"
+      - "docker-compose.yml"
+      - "scripts/**"
+      - ".github/workflows/ci.yml"
+
+jobs:
+  main:
+    name: Nx Cloud CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect CI-relevant changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            run:
+              - ".npmrc"
+              - "package.json"
+              - "package-lock.json"
+              - "nx.json"
+              - ".dockerignore"
+              - "patches/**"
+              - "apps/backend-api/package.json"
+              - "apps/backend-api/package-lock.json"
+              - "apps/backend-api/**"
+              - "apps/mobile/package.json"
+              - "apps/mobile/package-lock.json"
+              - "apps/mobile/**"
+              - "apps/admin/package.json"
+              - "apps/admin/package-lock.json"
+              - "apps/admin/**"
+              - "docker-compose.yml"
+              - "scripts/**"
+              - ".github/workflows/ci.yml"
+
+      - name: Derive appropriate SHAs for affected commands
+        if: steps.changes.outputs.run == 'true'
+        uses: nrwl/nx-set-shas@v4
+
+      - name: Setup Node.js
+        if: steps.changes.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/backend-api/package-lock.json
+            apps/mobile/package-lock.json
+            apps/admin/package-lock.json
+
+      - name: Install all dependencies (workspace hoisted)
+        if: steps.changes.outputs.run == 'true'
+        run: npm ci
+
+      - name: Generate Prisma client
+        if: steps.changes.outputs.run == 'true'
+        run: npx prisma generate
+        working-directory: apps/backend-api
+        env:
+          DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci"
+
+      - name: Lint affected
+        if: steps.changes.outputs.run == 'true'
+        run: npx nx affected --target=lint
+
+      - name: Typecheck affected
+        if: steps.changes.outputs.run == 'true'
+        run: npx nx affected --target=typecheck
+
+      - name: Test affected
+        if: steps.changes.outputs.run == 'true'
+        run: npx nx affected --target=test
+
+      - name: Build affected
+        if: steps.changes.outputs.run == 'true'
+        run: npx nx affected --target=build
+
+      - name: Skip CI for unrelated changes
+        if: steps.changes.outputs.run != 'true'
+        run: echo "No backend/mobile/admin/infra files changed; required CI context is satisfied."
+
+      - name: Self-Healing CI
+        if: always() && steps.changes.outputs.run == 'true'
+        run: npx nx fix-ci
+
+  docker:
+    name: Docker Build Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL_DOCKER: postgresql://ci:ci@host.docker.internal:5432/ci?schema=public
+      MQTT_BROKER_URL_DOCKER: mqtts://ci-mqtt.example.invalid:8883
+      MQTT_USERNAME: ""
+      MQTT_PASSWORD: ""
+      JWT_SECRET: ci-jwt-secret-for-docker-build-check
+      ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef
+      FRONTEND_URL: http://localhost:8081
+      ADMIN_URL: http://localhost:5173
+      RESEND_API_KEY: ci-dummy-resend-key
+      EMAIL_FROM: FallHelp CI <noreply@example.com>
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect Docker-relevant changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            run:
+              - ".npmrc"
+              - "package.json"
+              - "package-lock.json"
+              - "nx.json"
+              - ".dockerignore"
+              - "patches/**"
+              - "apps/backend-api/package.json"
+              - "apps/backend-api/package-lock.json"
+              - "apps/backend-api/**"
+              - "apps/admin/package.json"
+              - "apps/admin/package-lock.json"
+              - "apps/admin/**"
+              - "docker-compose.yml"
+              - "scripts/**"
+              - ".github/workflows/ci.yml"
+
+      - name: Validate Docker Compose config
+        if: steps.changes.outputs.run == 'true'
+        run: docker compose config --quiet
+
+      - name: Build Docker images
+        if: steps.changes.outputs.run == 'true'
+        run: docker compose build
+
+      - name: Skip Docker build for unrelated changes
+        if: steps.changes.outputs.run != 'true'
+        run: echo "No Docker/backend/admin/infra files changed; required Docker context is satisfied."

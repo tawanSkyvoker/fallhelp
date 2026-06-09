@@ -1,0 +1,84 @@
+name: Cross-Platform Smoke
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".npmrc"
+      - "package.json"
+      - "package-lock.json"
+      - "nx.json"
+      - "patches/**"
+      - "apps/backend-api/package.json"
+      - "apps/backend-api/package-lock.json"
+      - "apps/mobile/package.json"
+      - "apps/mobile/package-lock.json"
+      - "apps/admin/package.json"
+      - "apps/admin/package-lock.json"
+      - "scripts/**"
+      - ".github/workflows/cross-platform-smoke.yml"
+
+jobs:
+  smoke:
+    name: Smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect platform-relevant changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            run:
+              - ".npmrc"
+              - "package.json"
+              - "package-lock.json"
+              - "nx.json"
+              - "patches/**"
+              - "apps/backend-api/package.json"
+              - "apps/backend-api/package-lock.json"
+              - "apps/mobile/package.json"
+              - "apps/mobile/package-lock.json"
+              - "apps/admin/package.json"
+              - "apps/admin/package-lock.json"
+              - "scripts/**"
+              - ".github/workflows/cross-platform-smoke.yml"
+
+      - name: Setup Node.js
+        if: steps.changes.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/backend-api/package-lock.json
+            apps/mobile/package-lock.json
+            apps/admin/package-lock.json
+
+      - name: Install all dependencies (workspace hoisted)
+        if: steps.changes.outputs.run == 'true'
+        run: npm ci
+
+      - name: Verify install platform
+        if: steps.changes.outputs.run == 'true'
+        run: npm run platform:check
+
+      - name: Skip platform smoke for unrelated changes
+        if: steps.changes.outputs.run != 'true'
+        run: echo "No dependency/script files changed; required platform smoke context is satisfied."

@@ -1,0 +1,120 @@
+// ============================================================
+// FallHelp ER Schema (DBML)
+// ใช้สำหรับวางหรือ import เข้า dbdiagram.io โดยตรง
+// อ้างอิงจาก apps/backend-api/prisma/schema.prisma
+// ให้ยึด schema.prisma เป็น source of truth เมื่อ schema เปลี่ยน
+// ============================================================
+
+Table users {
+  id uuid [pk, not null]
+  email text [not null, unique]
+  password text [not null]
+  firstName text [not null]
+  lastName text [not null]
+  gender text
+  phone text [unique]
+  profileImage text
+  pushToken text
+  role text [not null, default: 'CAREGIVER', note: 'Allowed values: ADMIN, CAREGIVER']
+}
+
+Table auth_otps {
+  id uuid [pk, not null]
+  code text [not null]
+  expiresAt timestamp [not null]
+  createdAt timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  userId uuid [not null]
+
+  indexes {
+    (userId, expiresAt)
+  }
+}
+
+Table elders {
+  id uuid [pk, not null]
+  firstName text [not null]
+  lastName text [not null]
+  gender text
+  dateOfBirth date
+  height int
+  weight float
+  diseases text
+  phone text
+  houseNumber text
+  villageNumber text
+  villageName text
+  subdistrict text
+  district text
+  province text
+  zipcode text
+  userId uuid [not null, unique]
+}
+
+Table devices {
+  id uuid [pk, not null]
+  deviceCode text [not null, unique]
+  serialNumber text [not null, unique]
+  status text [not null, default: 'UNPAIRED', note: 'Allowed values: PAIRED, UNPAIRED']
+  wifiStatus text [not null, default: 'DISCONNECTED', note: 'Allowed values: CONNECTED, DISCONNECTED, CONFIGURING, ERROR']
+  lastOnline timestamp
+  updatedAt timestamp [not null]
+  elderId uuid [unique]
+}
+
+Table emergency_contacts {
+  id uuid [pk, not null]
+  name text [not null]
+  phone text [not null]
+  relationship text
+  priority int [not null]
+  elderId uuid [not null]
+
+  indexes {
+    (elderId, priority) [unique]
+  }
+}
+
+Table events {
+  id uuid [pk, not null]
+  fallStage text [not null, note: 'Allowed values: PENDING_CONFIRMATION, CONFIRMED, CANCELLED']
+  bpm int
+  magnitude float
+  postureDelta float
+  cancelledAt timestamp
+  timestamp timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  elderId uuid [not null]
+  deviceId uuid [not null]
+
+  indexes {
+    (elderId, timestamp)
+    (deviceId, timestamp)
+    (deviceId, fallStage, cancelledAt, timestamp)
+    (fallStage, timestamp)
+    (timestamp)
+  }
+}
+
+Table notifications {
+  id uuid [pk, not null]
+  title text [not null]
+  message text [not null]
+  isRead boolean [not null, default: false]
+  readAt timestamp
+  createdAt timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  userId uuid [not null]
+  eventId uuid [not null]
+
+  indexes {
+    (userId, isRead, createdAt)
+    (eventId)
+  }
+}
+
+Ref: auth_otps.userId > users.id [delete: cascade, update: cascade]
+Ref: elders.userId - users.id [delete: cascade, update: cascade]
+Ref: devices.elderId - elders.id [delete: set null, update: cascade]
+Ref: emergency_contacts.elderId > elders.id [delete: cascade, update: cascade]
+Ref: events.elderId > elders.id [delete: cascade, update: cascade]
+Ref: events.deviceId > devices.id [delete: cascade, update: cascade]
+Ref: notifications.userId > users.id [delete: cascade, update: cascade]
+Ref: notifications.eventId > events.id [delete: cascade, update: cascade]

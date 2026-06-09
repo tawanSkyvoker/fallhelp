@@ -1,0 +1,134 @@
+{
+  "name": "mobile",
+  "projectType": "application",
+  "sourceRoot": "apps/mobile",
+  "implicitDependencies": ["backend-api"],
+  "tags": ["scope:mobile", "type:app", "runtime:native"],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "typecheck"
+      },
+      "metadata": {
+        "description": "Typecheck mobile source"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "lint"
+      },
+      "metadata": {
+        "description": "Lint mobile source"
+      }
+    },
+    "test": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "test"
+      },
+      "metadata": {
+        "description": "Run mobile unit tests"
+      }
+    },
+    "test-light": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "test:light"
+      },
+      "metadata": {
+        "description": "Run mobile lightweight tests"
+      }
+    },
+    "test:watch": {
+      "executor": "nx:run-script",
+      "continuous": true,
+      "options": {
+        "script": "test:watch"
+      },
+      "metadata": {
+        "description": "Jest watch mode"
+      }
+    },
+    "test:coverage": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "test:coverage"
+      },
+      "metadata": {
+        "description": "Jest with coverage"
+      }
+    },
+    "dev": {
+      "executor": "nx:run-script",
+      "continuous": true,
+      "options": {
+        "script": "start"
+      },
+      "metadata": {
+        "description": "Alias for start (Expo dev server)"
+      }
+    },
+    "web": {
+      "executor": "nx:run-script",
+      "continuous": true,
+      "options": {
+        "script": "web"
+      },
+      "metadata": {
+        "description": "Start Expo dev server on web"
+      }
+    },
+    "start": {
+      "executor": "nx:run-script",
+      "continuous": true,
+      "options": {
+        "script": "start"
+      },
+      "metadata": {
+        "description": "Start Expo dev server"
+      }
+    },
+    "start:tunnel": {
+      "executor": "nx:run-script",
+      "continuous": true,
+      "options": {
+        "script": "start:tunnel"
+      },
+      "metadata": {
+        "description": "Start Expo dev server with tunnel"
+      }
+    },
+    "start:lan": {
+      "executor": "nx:run-script",
+      "continuous": true,
+      "options": {
+        "script": "start:lan"
+      },
+      "metadata": {
+        "description": "Start Expo dev server with LAN"
+      }
+    },
+    "android": {
+      "executor": "nx:run-script",
+      "continuous": true,
+      "options": {
+        "script": "android"
+      },
+      "metadata": {
+        "description": "Run on Android emulator/device"
+      }
+    },
+    "ios": {
+      "executor": "nx:run-script",
+      "continuous": true,
+      "options": {
+        "script": "ios"
+      },
+      "metadata": {
+        "description": "Run on iOS simulator/device"
+      }
+    }
+  }
+}

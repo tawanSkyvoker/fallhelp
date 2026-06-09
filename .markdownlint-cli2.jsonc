@@ -1,0 +1,29 @@
+{
+  // โฟกัสเฉพาะเอกสารหลักของ repo ก่อน เพื่อลด noise จากไฟล์ Markdown ภายนอก scope
+  "globs": [
+    "README.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "docs/**/*.md",
+    "apps/backend-api/docs/README.md",
+    "apps/mobile/README.md",
+    "apps/admin/README.md"
+  ],
+  "config": {
+    "default": true,
+
+    // เอกสารในโปรเจกต์มีตารางและบรรทัดอธิบายยาวจำนวนมาก
+    "MD013": false,
+    "MD060": false,
+
+    // บางไฟล์ใช้หลาย H1 และมีหัวข้อซ้ำกันคนละ section/ภาษา
+    "MD024": {
+      "siblings_only": true
+    },
+    "MD025": false,
+    "MD026": false,
+
+    // มี fenced block เก่าจำนวนมากที่ยังไม่ระบุภาษา ค่อยไล่เก็บภายหลังได้
+    "MD040": false
+  }
+}

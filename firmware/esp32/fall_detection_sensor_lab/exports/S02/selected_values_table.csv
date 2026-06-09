@@ -1,0 +1,10 @@
+trial_id,activity_label,expected_type,magnitude_g,posture_delta_deg,decision,summary
+T01,standing_still,non_fall,1.02,,ignored,ทำกิจกรรมปกติโดยไม่มีการแจ้งเตือน
+T02,walking_normal,non_fall,1.29,,ignored,ทำกิจกรรมปกติโดยไม่มีการแจ้งเตือน
+T03,running_light,non_fall,2.01,5.41,ignored,ทำกิจกรรมปกติโดยไม่มีการแจ้งเตือน
+T04,sit_normal,non_fall,1.26,,ignored,ทำกิจกรรมปกติโดยไม่มีการแจ้งเตือน
+T05,sit_hard,non_fall,2.15,27.73,ignored,ทำกิจกรรมปกติโดยไม่มีการแจ้งเตือน
+T06,side_fall_left,fall,2.00,158.64,suspected_fall,ตรวจพบการหกล้มและแจ้งเตือนภัยสำเร็จ
+T07,side_fall_right,fall,2.05,59.94,suspected_fall,ตรวจพบการหกล้มและแจ้งเตือนภัยสำเร็จ
+T08,forward_fall,fall,2.01,133.31,suspected_fall,ตรวจพบการหกล้มและแจ้งเตือนภัยสำเร็จ
+T09,backward_fall,fall,2.16,125.40,suspected_fall,ตรวจพบการหกล้มและแจ้งเตือนภัยสำเร็จ

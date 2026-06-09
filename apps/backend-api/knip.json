@@ -1,0 +1,17 @@
+{
+  "$schema": "https://unpkg.com/knip/schema.json",
+  "entry": ["src/app.ts", "scripts/*.ts"],
+  "project": ["src/**/*.ts", "!src/__tests__/**"],
+  "ignoreDependencies": [
+    "@prisma/client",
+    "@jest/globals",
+    "concurrently",
+    "ts-node-dev",
+    "@typescript-eslint/eslint-plugin",
+    "@typescript-eslint/parser",
+    "eslint-config-prettier",
+    "eslint-plugin-prettier",
+    "eslint-plugin-unused-imports"
+  ],
+  "ignoreExportsUsedInFile": true
+}

@@ -1,0 +1,5 @@
+trial_id,activity_label,expected_type,magnitude_g,posture_delta_deg,decision,summary
+T01,standing_still,non_fall,1.02,3.5,ignored,ค่าพื้นฐานขณะยืนนิ่ง
+T03,running_light,non_fall,1.85,14.0,ignored,มีการเคลื่อนไหวต่อเนื่องแต่ไม่เข้าเงื่อนไขล้ม
+T04,sit_hard,non_fall,2.12,22.0,ignored,แรงกระแทกสูงแต่ postureDelta ไม่ผ่าน threshold
+T05,side_fall_left,fall,2.31,58.2,suspected_fall,ผ่านทั้ง impact และ posture threshold

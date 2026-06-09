@@ -1,0 +1,1427 @@
+[
+  {
+    "id": "tab_fall_sensor_lab",
+    "type": "tab",
+    "label": "Fall Detection Sensor Lab IMU Log",
+    "disabled": false,
+    "info": "รับ device/+/lab/imu, เติม metadata, save 1 Trial = 1 CSV"
+  },
+  {
+    "id": "cmt_doc",
+    "type": "comment",
+    "z": "tab_fall_sensor_lab",
+    "name": "README",
+    "info": "Flow: Fall Detection Sensor Lab\\n\\nMQTT: device/+/lab/imu ผ่าน runtime env (local Mosquitto หรือ cloud MQTT)\\n\\nตั้งค่า broker ผ่าน env เท่านั้น: MQTT_BROKER_HOST, MQTT_BROKER_PORT, MQTT_USE_TLS, MQTT_USERNAME, MQTT_PASSWORD ไม่ commit host/secret จริงลงไฟล์นี้\\n\\nenv ที่ใช้:\\n- SENSOR_LAB_SESSION_ID (default S01)\\n- SENSOR_LAB_RUNS_DIR (default firmware/esp32/fall_detection_sensor_lab/runs)\\n\\nวิธีใช้ (FlowFuse Dashboard 2.0 เท่านั้น ที่ /ui — ไม่มี manual inject แล้ว):\\n1) Deploy -> Init Globals ทำงานอัตโนมัติ\\n2) เปิด /ui -> กรอก Session ID เช่น S01 (ครั้งเดียว)\\n3) กดปุ่มท่า (1 ใน 9) -> metadata + trialId auto -> Countdown 10s\\n4) ทำท่า -> กด Stop Trial\\n5) ได้ไฟล์ Sxx_Txx_activity.csv ใน runs/Sxx/raw/ (1 Trial = 1 CSV)",
+    "x": 650,
+    "y": 100,
+    "wires": []
+  },
+  {
+    "id": "mqtt_broker_sensor_lab",
+    "type": "mqtt-broker",
+    "name": "MQTT Broker (env)",
+    "broker": "${MQTT_BROKER_HOST}",
+    "port": "${MQTT_BROKER_PORT}",
+    "clientid": "",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true,
+    "credentials": {
+      "user": "${MQTT_USERNAME}",
+      "password": "${MQTT_PASSWORD}"
+    }
+  },
+  {
+    "id": "inj_init",
+    "type": "inject",
+    "z": "tab_fall_sensor_lab",
+    "name": "Init Globals (on deploy)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "0.5",
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 150,
+    "y": 100,
+    "wires": [
+      [
+        "fn_init"
+      ]
+    ]
+  },
+  {
+    "id": "fn_init",
+    "type": "function",
+    "z": "tab_fall_sensor_lab",
+    "name": "Init Globals",
+    "func": "\n// ตั้งค่า global ตอน deploy: header + path\nglobal.set(\"FALL_SENSOR_LAB_CSV_HEADER\", \"session_id,trial_id,activity_label,expected_type,timestamp_ms,type,state,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps,svm_raw_g,svm_filtered_g,pitch_deg,roll_deg,pitch_before_deg,roll_before_deg,pitch_after_deg,roll_after_deg,pitch_delta_deg,roll_delta_deg,posture_delta_deg,impact_threshold_g,posture_threshold_deg,stabilize_ms,decision,note\");\nflow.set(\"runsDir\", env.get(\"SENSOR_LAB_RUNS_DIR\")\n    || \"firmware/esp32/fall_detection_sensor_lab/runs\");\nflow.set(\"recording\", false);\nnode.status({fill:\"green\",shape:\"dot\",text:\"globals ready\"});\nreturn null;\n",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 650,
+    "y": 160,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "fn_start",
+    "type": "function",
+    "z": "tab_fall_sensor_lab",
+    "name": "Start Trial",
+    "func": "\n// ตั้ง metadata + เปิดบันทึก + เขียน header\n// #2 กัน trial ไม่มี metadata : ปกติ fn_activity บน Dashboard ตั้ง trialMeta ให้แล้ว\nvar fmeta = flow.get(\"trialMeta\");\nvar hasMsgMeta = msg.trialId && msg.activityLabel;\nif (!fmeta && !hasMsgMeta) {\n    node.status({fill:\"red\",shape:\"ring\",text:\"กดปุ่ม Activity บน Dashboard ก่อนเริ่ม Trial\"});\n    return null;\n}\n\nvar meta = {\n    sessionId: (fmeta && fmeta.sessionId) || env.get(\"SENSOR_LAB_SESSION_ID\") || \"-\",\n    trialId: msg.trialId || (fmeta && fmeta.trialId) || \"T01\",\n    activityLabel: msg.activityLabel || (fmeta && fmeta.activityLabel) || \"standing_still\",\n    expectedType: msg.expectedType || (fmeta && fmeta.expectedType) || \"non_fall\",\n    note: msg.note || (fmeta && fmeta.note) || \"\"\n};\nflow.set(\"trialMeta\", meta);\nflow.set(\"recording\", true);\n\nvar sid = meta.sessionId, tid = meta.trialId, act = meta.activityLabel;\nvar file = flow.get(\"runsDir\") + \"/\" + sid + \"/raw/\" + sid + \"_\" + tid + \"_\" + act + \".csv\";\n\n// #1 กัน header ซ้ำกลางไฟล์ : ถ้า trial นี้เคย Start แล้วใน session นี้ ไม่เขียน header อีก\nvar started = flow.get(\"startedFiles\") || {};\nif (started[file]) {\n    node.status({fill:\"yellow\",shape:\"dot\",text:\"resume \"+tid+\" (header มีแล้ว)\"});\n    return null;\n}\nstarted[file] = true;\nflow.set(\"startedFiles\", started);\n\nvar header = global.get(\"FALL_SENSOR_LAB_CSV_HEADER\");\nnode.status({fill:\"blue\",shape:\"dot\",text:\"REC \"+sid+\"_\"+tid+\" \"+act});\n\n// ส่ง header ออกไป init ไฟล์ (file node createDir=true จะสร้างโฟลเดอร์ให้)\nreturn [{ filename: file, payload: header, _initHeader: true }];\n",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 650,
+    "y": 240,
+    "wires": [
+      [
+        "file_header"
+      ]
+    ]
+  },
+  {
+    "id": "file_header",
+    "type": "file",
+    "z": "tab_fall_sensor_lab",
+    "name": "Init CSV Header",
+    "filename": "filename",
+    "filenameType": "msg",
+    "appendNewline": true,
+    "createDir": true,
+    "overwriteFile": "false",
+    "encoding": "none",
+    "x": 650,
+    "y": 320,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "fn_stop",
+    "type": "function",
+    "z": "tab_fall_sensor_lab",
+    "name": "Stop Trial",
+    "func": "\n// Stop pressed: แสดงสถานะอย่างเดียว การตัดสิน/มิวเทตทำที่ fn_trialdone\n// (กัน race: ไม่แก้ recording/countdown ที่นี่)\nvar meta = flow.get(\"trialMeta\") || {};\nnode.status({fill:\"grey\",shape:\"ring\",text:\"stop pressed \"+(meta.trialId||\"\")});\nreturn null;\n",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 650,
+    "y": 380,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "mqtt_lab_imu",
+    "type": "mqtt in",
+    "z": "tab_fall_sensor_lab",
+    "name": "device/+/lab/imu",
+    "topic": "device/+/lab/imu",
+    "qos": "0",
+    "datatype": "auto",
+    "broker": "mqtt_broker_sensor_lab",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 150,
+    "y": 160,
+    "wires": [
+      [
+        "fn_buildrow",
+        "fn_live",
+        "fn_throttle_log"
+      ]
+    ]
+  },
+  {
+    "id": "fn_buildrow",
+    "type": "function",
+    "z": "tab_fall_sensor_lab",
+    "name": "Build CSV Row",
+    "func": "\n// รับ payload จาก device/+/lab/imu แล้วแปลงเป็น CSV row\n// เก็บเฉพาะช่วงที่ Start Trial แล้ว (flow.recording === true)\nif (flow.get(\"recording\") !== true) {\n    node.status({fill:\"grey\",shape:\"ring\",text:\"idle (no trial)\"});\n    return null;\n}\n\nvar p = msg.payload;\nif (typeof p === \"string\") {\n    try { p = JSON.parse(p); } catch (e) { return null; }\n}\n\nvar meta = flow.get(\"trialMeta\") || {};\nvar serial = (msg.topic || \"\").split(\"/\")[1] || \"unknown\";\n\nfunction f(v){ return (v === undefined || v === null) ? \"\" : v; }\n\nvar cols = [\n    f(meta.sessionId), f(meta.trialId), f(meta.activityLabel), f(meta.expectedType),\n    f(p.timestamp), f(p.type), f(p.state),\n    f(p.ax), f(p.ay), f(p.az), f(p.gx), f(p.gy), f(p.gz),\n    f(p.svmRaw), f(p.svmFiltered),\n    f(p.pitch), f(p.roll),\n    f(p.pitchBefore), f(p.rollBefore), f(p.pitchAfter), f(p.rollAfter),\n    f(p.pitchDelta), f(p.rollDelta), f(p.postureDelta),\n    f(p.impactThreshold), f(p.postureThreshold), f(p.stabilizeMs),\n    f(p.decision), f(meta.note)\n];\n\nvar sid = meta.sessionId || \"S00\";\nvar tid = meta.trialId || \"T00\";\nvar act = meta.activityLabel || \"unknown\";\nmsg.filename = flow.get(\"runsDir\") + \"/\" + sid + \"/raw/\" + sid + \"_\" + tid + \"_\" + act + \".csv\";\nmsg.payload = cols.join(\",\");\nnode.status({fill:\"green\",shape:\"dot\",text:sid+\"_\"+tid+\" \"+f(p.type)});\nreturn msg;\n",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 650,
+    "y": 460,
+    "wires": [
+      [
+        "file_csv",
+        "dbg_row"
+      ]
+    ]
+  },
+  {
+    "id": "file_csv",
+    "type": "file",
+    "z": "tab_fall_sensor_lab",
+    "name": "Save Trial CSV",
+    "filename": "filename",
+    "filenameType": "msg",
+    "appendNewline": true,
+    "createDir": true,
+    "overwriteFile": "false",
+    "x": 650,
+    "y": 540,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "dbg_row",
+    "type": "debug",
+    "z": "tab_fall_sensor_lab",
+    "name": "row",
+    "active": false,
+    "tosidebar": true,
+    "console": false,
+    "complete": "payload",
+    "x": 900,
+    "y": 100,
+    "wires": []
+  },
+  {
+    "id": "ui_grp_ctrl",
+    "type": "ui-group",
+    "name": "Trial Control",
+    "page": "ui_page_334",
+    "width": "6",
+    "height": "",
+    "order": 1,
+    "showTitle": true,
+    "className": "",
+    "visible": true,
+    "disabled": false
+  },
+  {
+    "id": "ui_grp_live",
+    "type": "ui-group",
+    "name": "Live Sensor",
+    "page": "ui_page_334",
+    "width": "12",
+    "height": "",
+    "order": 3,
+    "showTitle": true,
+    "className": "",
+    "visible": true,
+    "disabled": false
+  },
+  {
+    "id": "ui_grp_chart",
+    "type": "ui-group",
+    "name": "Live Charts (Raw Sensor)",
+    "page": "ui_page_334",
+    "width": "12",
+    "height": "",
+    "order": 4,
+    "showTitle": true,
+    "className": "",
+    "visible": true,
+    "disabled": false
+  },
+  {
+    "id": "ui_grp_meta",
+    "type": "ui-group",
+    "name": "Trial & System Info",
+    "page": "ui_page_334",
+    "width": "6",
+    "height": "",
+    "order": 2,
+    "showTitle": true,
+    "className": "",
+    "visible": true,
+    "disabled": false
+  },
+  {
+    "id": "ui_session",
+    "type": "ui-form",
+    "z": "tab_fall_sensor_lab",
+    "name": "Session ID",
+    "label": "สร้าง Session ใหม่",
+    "tooltip": "ตั้งครั้งเดียวต่อรอบเก็บข้อมูล เช่น ",
+    "group": "ui_grp_ctrl",
+    "order": 3,
+    "width": 6,
+    "height": 1,
+    "passthru": false,
+    "className": "",
+    "x": 900,
+    "y": 160,
+    "wires": [
+      [
+        "fn_session",
+        "dbg_session"
+      ]
+    ],
+    "payload": "",
+    "options": [
+      {
+        "label": "Session ID (กรอก 1, 2, ... หรือ S01)",
+        "key": "sessionId",
+        "type": "text",
+        "required": false,
+        "rows": null
+      }
+    ],
+    "formValue": {
+      "sessionId": ""
+    },
+    "submit": "บันทึก Session",
+    "cancel": "",
+    "splitLayout": ""
+  },
+  {
+    "id": "fn_session",
+    "type": "function",
+    "z": "tab_fall_sensor_lab",
+    "name": "Apply Session ID",
+    "func": "var raw = '';\nif (typeof msg.payload === 'object' && msg.payload.sessionId !== undefined) {\n    raw = msg.payload.sessionId;\n} else if (typeof msg.payload === 'string') {\n    raw = msg.payload;\n}\nraw = ('' + raw).trim();\nif (!raw) { node.status({fill:'red',shape:'ring',text:'กรอก Session ID'}); return null; }\n\nvar m = raw.match(/^[Ss]?0*(\\d+)$/);\nif (!m) {\n    node.status({fill:'red',shape:'ring',text:'ไม่อนุญาตตัวอักษรพิเศษ (ใช้ S ตามด้วยตัวเลขเท่านั้น)'});\n    return null;\n}\n\nvar n = parseInt(m[1], 10);\nvar sid = 'S' + ('' + n).padStart(2, '0');\n\nvar nextSeq = 1;\nvar completedActs = [];\ntry {\n    var baseDir = '/data/runs';\n    var sessionDir = pathMod.join(baseDir, sid);\n    var rawDir = pathMod.join(sessionDir, 'raw');\n    var selectedDir = pathMod.join(sessionDir, 'selected');\n    var notesFile = pathMod.join(sessionDir, 'session_notes.md');\n    \n    if (!fsMod.existsSync(rawDir)) {\n        fsMod.mkdirSync(rawDir, { recursive: true });\n        node.warn('Created directory: ' + rawDir);\n    } else {\n        var files = fsMod.readdirSync(rawDir);\n        files.forEach(function(f) {\n            var match = f.match(/_T(\\d+)_([^.]+)\\.csv$/);\n            if (match) {\n                var tSeq = parseInt(match[1], 10);\n                if (tSeq >= nextSeq) {\n                    nextSeq = tSeq + 1;\n                }\n                var actLabel = match[2];\n                if (completedActs.indexOf(actLabel) === -1) {\n                    completedActs.push(actLabel);\n                }\n            }\n        });\n    }\n\n    if (!fsMod.existsSync(selectedDir)) {\n        fsMod.mkdirSync(selectedDir, { recursive: true });\n        node.warn('Created directory: ' + selectedDir);\n    }\n\n    if (!fsMod.existsSync(notesFile)) {\n        var notesContent = \"# Session \" + sid + \" Notes\\n\\nใช้จดปัญหาและข้อสังเกตระหว่างการเก็บข้อมูล\\n\\n## ตารางบันทึกปัญหา\\n\\n| Date | Trial | Activity | Note | Action |\\n|---|---|---|---|---|\\n| - | - | - | - | - |\\n\\n## Checklist หลังเก็บข้อมูล\\n\\n| รายการ | สถานะ |\\n|---|---|\\n| CSV ถูกสร้างใน raw/ | [ ] |\\n| คัดเลือกไฟล์ไปที่ selected/ | [ ] |\\n| มี note ถ้าพบปัญหา | [ ] |\\n| ถ่ายภาพท่าทดสอบแล้ว | [ ] |\\n\";\n        fsMod.writeFileSync(notesFile, notesContent, 'utf8');\n        node.warn('Created notes file: ' + notesFile);\n    }\n} catch(err) {\n    node.error('Failed to create/scan directory: ' + err.toString());\n}\n\nflow.set('sessionId', sid);\nflow.set('trialSeq', nextSeq - 1);\nflow.set('completedActivities', completedActs);\n\nvar meta = flow.get('trialMeta') || {};\nmeta.sessionId = sid;\nflow.set('trialMeta', meta);\n\nvar nextId = 'T' + ('' + nextSeq).padStart(2, '0');\nnode.status({fill:'green', shape:'dot', text:'session ' + sid + ' (' + completedActs.length + ' acts)'});\n\nvar warnMsg = completedActs.length > 0 ? \" | ทำแล้ว \" + completedActs.length + \" ท่า\" : \"\";\n\nreturn [\n    { payload: 'บันทึก Session ' + sid + ' สำเร็จแล้ว' + warnMsg },\n    { payload: { sessionId: sid, trialId: nextId, activityLabel: '-', expectedType: '-', recordingState: (flow.get('recording') === true ? 'recording' : 'ready') } },\n    { payload: 'scan' },\n    { payload: 'reset' }\n];",
+    "outputs": 4,
+    "noerr": 0,
+    "x": 650,
+    "y": 600,
+    "wires": [
+      [
+        "ui_notify_session"
+      ],
+      [
+        "fn_readiness"
+      ],
+      [
+        "fn_scan_sessions"
+      ],
+      [
+        "fn_reset_form"
+      ]
+    ],
+    "libs": [
+      {
+        "var": "fsMod",
+        "module": "fs"
+      },
+      {
+        "var": "pathMod",
+        "module": "path"
+      }
+    ]
+  },
+  {
+    "id": "ui_btn_standing_still",
+    "type": "ui-button",
+    "z": "tab_fall_sensor_lab",
+    "name": "ยืนนิ่ง (Standing)",
+    "group": "ui_grp_ctrl",
+    "order": 8,
+    "width": 3,
+    "height": 1,
+    "label": "ยืนนิ่ง (Standing)",
+    "tooltip": "ยืนนิ่ง 10–15 วินาที\n[non_fall] เก็บ 2 trials",
+    "color": "#ffffff",
+    "bgcolor": "#059669",
+    "className": "",
+    "icon": "",
+    "iconPosition": "left",
+    "payload": "standing_still",
+    "payloadType": "str",
+    "topic": "activity",
+    "topicType": "str",
+    "buttonColor": "#059669",
+    "textColor": "#ffffff",
+    "x": 150,
+    "y": 300,
+    "wires": [
+      [
+        "fn_activity"
+      ]
+    ]
+  },
+  {
+    "id": "ui_btn_walking_normal",
+    "type": "ui-button",
+    "z": "tab_fall_sensor_lab",
+    "name": "เดินปกติ (Walking)",
+    "group": "ui_grp_ctrl",
+    "order": 10,
+    "width": 3,
+    "height": 1,
+    "label": "เดินปกติ (Walking)",
+    "tooltip": "เดินปกติ 10–15 วินาที\n[non_fall] เก็บ 2 trials",
+    "color": "#ffffff",
+    "bgcolor": "#059669",
+    "className": "",
+    "icon": "",
+    "iconPosition": "left",
+    "payload": "walking_normal",
+    "payloadType": "str",
+    "topic": "activity",
+    "topicType": "str",
+    "buttonColor": "#059669",
+    "textColor": "#ffffff",
+    "x": 150,
+    "y": 350,
+    "wires": [
+      [
+        "fn_activity"
+      ]
+    ]
+  },
+  {
+    "id": "ui_btn_running_light",
+    "type": "ui-button",
+    "z": "tab_fall_sensor_lab",
+    "name": "วิ่งเบา ๆ (Jogging)",
+    "group": "ui_grp_ctrl",
+    "order": 12,
+    "width": 3,
+    "height": 1,
+    "label": "วิ่งเบา ๆ (Jogging)",
+    "tooltip": "วิ่งเบา ๆ 10–15 วินาที\n[non_fall] เก็บ 3 trials",
+    "color": "#ffffff",
+    "bgcolor": "#059669",
+    "className": "",
+    "icon": "",
+    "iconPosition": "left",
+    "payload": "running_light",
+    "payloadType": "str",
+    "topic": "activity",
+    "topicType": "str",
+    "buttonColor": "#059669",
+    "textColor": "#ffffff",
+    "x": 150,
+    "y": 400,
+    "wires": [
+      [
+        "fn_activity"
+      ]
+    ]
+  },
+  {
+    "id": "ui_btn_sit_normal",
+    "type": "ui-button",
+    "z": "tab_fall_sensor_lab",
+    "name": "นั่งลงปกติ (Sitting)",
+    "group": "ui_grp_ctrl",
+    "order": 14,
+    "width": 3,
+    "height": 1,
+    "label": "นั่งลงปกติ (Sitting)",
+    "tooltip": "ยืน → นั่งลงปกติ → ค้าง 3–5 วินาที\n[non_fall] เก็บ 2 trials",
+    "color": "#ffffff",
+    "bgcolor": "#059669",
+    "className": "",
+    "icon": "",
+    "iconPosition": "left",
+    "payload": "sit_normal",
+    "payloadType": "str",
+    "topic": "activity",
+    "topicType": "str",
+    "buttonColor": "#059669",
+    "textColor": "#ffffff",
+    "x": 150,
+    "y": 450,
+    "wires": [
+      [
+        "fn_activity"
+      ]
+    ]
+  },
+  {
+    "id": "ui_btn_sit_hard",
+    "type": "ui-button",
+    "z": "tab_fall_sensor_lab",
+    "name": "นั่งลงแรง (Hard Sitting)",
+    "group": "ui_grp_ctrl",
+    "order": 16,
+    "width": 3,
+    "height": 1,
+    "label": "นั่งลงแรง (Hard Sitting)",
+    "tooltip": "ยืน → นั่งลงแรงกว่าปกติ → ค้าง 3–5 วินาที\n[non_fall] เก็บ 3 trials",
+    "color": "#ffffff",
+    "bgcolor": "#059669",
+    "className": "",
+    "icon": "",
+    "iconPosition": "left",
+    "payload": "sit_hard",
+    "payloadType": "str",
+    "topic": "activity",
+    "topicType": "str",
+    "buttonColor": "#059669",
+    "textColor": "#ffffff",
+    "x": 150,
+    "y": 500,
+    "wires": [
+      [
+        "fn_activity"
+      ]
+    ]
+  },
+  {
+    "id": "ui_btn_side_fall_left",
+    "type": "ui-button",
+    "z": "tab_fall_sensor_lab",
+    "name": "ล้มด้านซ้าย (Fall Left)",
+    "group": "ui_grp_ctrl",
+    "order": 9,
+    "width": 3,
+    "height": 1,
+    "label": "ล้มด้านซ้าย (Fall Left)",
+    "tooltip": "⚠️ ล้มจำลองไปด้านซ้ายบนเบาะ → ค้าง 3–5 วินาที\n[fall] เก็บ 3 trials",
+    "color": "#ffffff",
+    "bgcolor": "#059669",
+    "className": "",
+    "icon": "",
+    "iconPosition": "left",
+    "payload": "side_fall_left",
+    "payloadType": "str",
+    "topic": "activity",
+    "topicType": "str",
+    "buttonColor": "#059669",
+    "textColor": "#ffffff",
+    "x": 350,
+    "y": 300,
+    "wires": [
+      [
+        "fn_activity"
+      ]
+    ]
+  },
+  {
+    "id": "ui_btn_side_fall_right",
+    "type": "ui-button",
+    "z": "tab_fall_sensor_lab",
+    "name": "ล้มด้านขวา (Fall Right)",
+    "group": "ui_grp_ctrl",
+    "order": 11,
+    "width": 3,
+    "height": 1,
+    "label": "ล้มด้านขวา (Fall Right)",
+    "tooltip": "⚠️ ล้มจำลองไปด้านขวาบนเบาะ → ค้าง 3–5 วินาที\n[fall] เก็บ 3 trials",
+    "color": "#ffffff",
+    "bgcolor": "#059669",
+    "className": "",
+    "icon": "",
+    "iconPosition": "left",
+    "payload": "side_fall_right",
+    "payloadType": "str",
+    "topic": "activity",
+    "topicType": "str",
+    "buttonColor": "#059669",
+    "textColor": "#ffffff",
+    "x": 350,
+    "y": 350,
+    "wires": [
+      [
+        "fn_activity"
+      ]
+    ]
+  },
+  {
+    "id": "ui_btn_forward_fall",
+    "type": "ui-button",
+    "z": "tab_fall_sensor_lab",
+    "name": "ล้มไปข้างหน้า (Fall Forward)",
+    "group": "ui_grp_ctrl",
+    "order": 13,
+    "width": 3,
+    "height": 1,
+    "label": "ล้มไปข้างหน้า (Fall Forward)",
+    "tooltip": "⚠️ ล้มจำลองไปข้างหน้าบนเบาะ → ค้าง 3–5 วินาที\n[fall] เก็บ 3 trials",
+    "color": "#ffffff",
+    "bgcolor": "#059669",
+    "className": "",
+    "icon": "",
+    "iconPosition": "left",
+    "payload": "forward_fall",
+    "payloadType": "str",
+    "topic": "activity",
+    "topicType": "str",
+    "buttonColor": "#059669",
+    "textColor": "#ffffff",
+    "x": 350,
+    "y": 400,
+    "wires": [
+      [
+        "fn_activity"
+      ]
+    ]
+  },
+  {
+    "id": "ui_btn_backward_fall",
+    "type": "ui-button",
+    "z": "tab_fall_sensor_lab",
+    "name": "ล้มไปข้างหลัง (Fall Backward)",
+    "group": "ui_grp_ctrl",
+    "order": 15,
+    "width": 3,
+    "height": 1,
+    "label": "ล้มไปข้างหลัง (Fall Backward)",
+    "tooltip": "⚠️ ล้มจำลองไปข้างหลังบนเบาะ → ค้าง 3–5 วินาที\n[fall] เก็บ 3 trials",
+    "color": "#ffffff",
+    "bgcolor": "#059669",
+    "className": "",
+    "icon": "",
+    "iconPosition": "left",
+    "payload": "backward_fall",
+    "payloadType": "str",
+    "topic": "activity",
+    "topicType": "str",
+    "buttonColor": "#059669",
+    "textColor": "#ffffff",
+    "x": 350,
+    "y": 450,
+    "wires": [
+      [
+        "fn_activity"
+      ]
+    ]
+  },
+  {
+    "id": "fn_activity",
+    "type": "function",
+    "z": "tab_fall_sensor_lab",
+    "name": "Select Activity + Meta",
+    "func": "\nvar FALL = {side_fall_left:1, side_fall_right:1, forward_fall:1, backward_fall:1};\nvar act = msg.payload;\n\nif (!act) { \n    node.status({fill:\"red\",shape:\"ring\",text:\"no activity\"}); \n    return null; \n}\n\nvar completedActs = flow.get(\"completedActivities\") || [];\nif (completedActs.indexOf(act) !== -1) {\n    node.status({fill:\"red\",shape:\"ring\",text:\"ทำไปแล้ว\"});\n    return [null, null, {payload: \"⚠️ ท่า \" + act + \" ได้ถูกบันทึกไปแล้วใน Session นี้! (เปลี่ยนท่าอื่น หรือสร้าง Session ใหม่)\"}];\n}\n\nif (flow.get(\"recording\") === true || flow.get(\"countdownActive\") === true) {\n    node.status({fill:\"red\",shape:\"ring\",text:\"trial กำลังทำงาน\"});\n    return [null, null, {payload: \"กำลังบันทึกข้อมูลอยู่ กรุณากด Stop Trial ก่อนเริ่มรอบใหม่\"}];\n}\n\nvar sid = flow.get(\"sessionId\") || env.get(\"SENSOR_LAB_SESSION_ID\") || \"-\";\nif (!sid || sid === \"-\") {\n    node.status({fill:\"red\",shape:\"ring\",text:\"กรุณากรอก Session ID\"});\n    return [null, null, {payload: \"กรุณาระบุ Session ID และกดบันทึกก่อนเริ่มทดสอบ!\"}];\n}\n\nvar lab = flow.get(\"lastLabMsgTs\");\nvar now = Date.now();\nif (!lab || (now - lab > 10000)) {\n    node.status({fill:\"red\",shape:\"ring\",text:\"Device Offline - Cannot start\"});\n    return [null, null, {payload: \"❌ อุปกรณ์ออฟไลน์! ไม่พบสัญญาณจากเซนเซอร์ กรุณาตรวจสอบให้แน่ใจว่า Device เชื่อมต่ออยู่ก่อนกดปุ่ม\"}];\n}\n\nvar seq = (flow.get(\"trialSeq\") || 0) + 1;\nvar tid = \"T\" + (\"\" + seq).padStart(2, \"0\");\nvar meta = {\n    sessionId: sid,\n    trialId: tid,\n    activityLabel: act,\n    expectedType: FALL[act] ? \"fall\" : \"non_fall\",\n    note: \"\"\n};\nflow.set(\"trialMeta\", meta);\nflow.set(\"pendingSeq\", seq);\nnode.status({fill:\"yellow\",shape:\"dot\",text:tid+\" \"+act+\" -> countdown\"});\n\nreturn [\n    {trialId: tid, activityLabel: meta.activityLabel, expectedType: meta.expectedType, note: \"\"},\n    {payload:{sessionId:sid, trialId:tid, activityLabel:meta.activityLabel, expectedType:meta.expectedType, recordingState:\"countdown\"}},\n    null\n];",
+    "outputs": 3,
+    "noerr": 0,
+    "x": 650,
+    "y": 680,
+    "wires": [
+      [
+        "fn_countdown"
+      ],
+      [
+        "fn_readiness"
+      ],
+      [
+        "ui_error_toast"
+      ]
+    ]
+  },
+  {
+    "id": "fn_countdown",
+    "type": "function",
+    "z": "tab_fall_sensor_lab",
+    "name": "Countdown 10s",
+    "func": "\n// นับถอยหลัง 10 วินาทีก่อนเริ่ม recording (ไม่มีเสียงใน dashboard)\nvar startMeta = {trialId: msg.trialId, activityLabel: msg.activityLabel, expectedType: msg.expectedType, note: msg.note || \"\"};\nvar sid = flow.get(\"sessionId\") || env.get(\"SENSOR_LAB_SESSION_ID\") || \"-\";\nvar prev = flow.get(\"countdownTimer\");\nif (prev) { clearInterval(prev); }\nflow.set(\"countdownActive\", true);\nvar left = 10;\nflow.set(\"countdownLeft\", left);\nnode.send([null, {payload: \"Countdown \" + left + \"...\"}, {payload:{sessionId:sid, trialId:startMeta.trialId, activityLabel:startMeta.activityLabel, expectedType:startMeta.expectedType, recordingState:\"countdown (\" + left + \"s)\"}}]);\nnode.status({fill:\"blue\",shape:\"ring\",text:\"Countdown \"+left});\nvar t = setInterval(function () {\n    left--;\n    flow.set(\"countdownLeft\", left);\n    if (left > 0) {\n        node.send([null, {payload: \"Countdown \" + left + \"...\"}, {payload:{sessionId:sid, trialId:startMeta.trialId, activityLabel:startMeta.activityLabel, expectedType:startMeta.expectedType, recordingState:\"countdown (\" + left + \"s)\"}}]);\n        node.status({fill:\"blue\",shape:\"ring\",text:\"Countdown \"+left});\n        return;\n    }\n    clearInterval(t);\n    flow.set(\"countdownTimer\", null);\n    flow.set(\"countdownActive\", false);\n    flow.set(\"countdownLeft\", null);\n    node.send([{trialId:startMeta.trialId, activityLabel:startMeta.activityLabel, expectedType:startMeta.expectedType, note:startMeta.note}, {payload:\"Recording: action — เริ่มทำท่าได้\"}, {payload:{sessionId:sid, trialId:startMeta.trialId, activityLabel:startMeta.activityLabel, expectedType:startMeta.expectedType, recordingState:\"recording\"}}]);\n    node.status({fill:\"green\",shape:\"dot\",text:\"REC \"+startMeta.trialId});\n}, 1000);\nflow.set(\"countdownTimer\", t);\nreturn null;\n",
+    "outputs": 3,
+    "noerr": 0,
+    "x": 650,
+    "y": 760,
+    "wires": [
+      [
+        "fn_start"
+      ],
+      [
+        "ui_status"
+      ],
+      [
+        "fn_readiness"
+      ]
+    ]
+  },
+  {
+    "id": "ui_btn_stop",
+    "type": "ui-button",
+    "z": "tab_fall_sensor_lab",
+    "name": "Stop Trial",
+    "group": "ui_grp_ctrl",
+    "order": 17,
+    "width": 6,
+    "height": 1,
+    "label": "■ Stop Trial",
+    "tooltip": "หยุดบันทึกและปิดไฟล์ trial นี้ (manual stop)",
+    "color": "",
+    "bgcolor": "",
+    "className": "",
+    "icon": "",
+    "iconPosition": "left",
+    "payload": "stop",
+    "payloadType": "str",
+    "topic": "stop",
+    "topicType": "str",
+    "buttonColor": "#c62828",
+    "textColor": "",
+    "x": 150,
+    "y": 550,
+    "wires": [
+      [
+        "fn_stop",
+        "fn_trialdone"
+      ]
+    ]
+  },
+  {
+    "id": "fn_trialdone",
+    "type": "function",
+    "z": "tab_fall_sensor_lab",
+    "name": "Trial Done + Next ID",
+    "func": "\nvar rec = flow.get(\"recording\") === true;\nvar cd = flow.get(\"countdownActive\") === true;\nvar prev = flow.get(\"countdownTimer\");\nif (prev) { clearInterval(prev); flow.set(\"countdownTimer\", null); }\nflow.set(\"countdownActive\", false);\nflow.set(\"countdownLeft\", null);\nflow.set(\"recording\", false);\nvar sid = flow.get(\"sessionId\") || env.get(\"SENSOR_LAB_SESSION_ID\") || \"-\";\nvar meta = flow.get(\"trialMeta\") || {};\nif (rec) {\n    var done = flow.get(\"pendingSeq\");\n    if (done !== undefined && done !== null) {\n        flow.set(\"trialSeq\", done);\n        flow.set(\"pendingSeq\", null);\n    }\n    \n    // Add to completed activities\n    if (meta.activityLabel) {\n        var completedActs = flow.get(\"completedActivities\") || [];\n        if (completedActs.indexOf(meta.activityLabel) === -1) {\n            completedActs.push(meta.activityLabel);\n            flow.set(\"completedActivities\", completedActs);\n        }\n    }\n\n    var nextSeq = (flow.get(\"trialSeq\") || 0) + 1;\n    var nextId = \"T\" + (\"\" + nextSeq).padStart(2, \"0\");\n    var saved = sid + \"_\" + (meta.trialId || \"T00\") + \"_\" + (meta.activityLabel || \"unknown\") + \".csv\";\n    flow.set(\"lastSavedCsv\", saved);\n    node.status({fill:\"grey\",shape:\"ring\",text:\"stopped, next \"+nextId});\n    return [\n        {payload:\"Session \"+sid+\" | Next Trial: \"+nextId + \" | ทำแล้ว \" + (flow.get(\"completedActivities\")||[]).length + \" ท่า\"},\n        {payload:\"Stopped / CSV saved\"},\n        {payload:{sessionId:sid, trialId:(meta.trialId || \"-\"), activityLabel:(meta.activityLabel || \"-\"), expectedType:(meta.expectedType || \"-\"), recordingState:\"stopped\", lastSavedCsv:saved}}\n    ];\n}\nflow.set(\"pendingSeq\", null);\nvar keepSeq = (flow.get(\"trialSeq\") || 0) + 1;\nvar keepId = \"T\" + (\"\" + keepSeq).padStart(2, \"0\");\nnode.status({fill:\"yellow\",shape:\"ring\",text: cd ? \"countdown cancelled\" : \"ready\"});\nreturn [\n    {payload:\"Session \"+sid+\" | Next Trial: \"+keepId + \" | ทำแล้ว \" + (flow.get(\"completedActivities\")||[]).length + \" ท่า\"},\n    {payload: cd ? \"Countdown cancelled — เลือกท่าใหม่ได้\" : \"Ready\"},\n    {payload:{sessionId:sid, trialId:(meta.trialId || keepId), activityLabel:(meta.activityLabel || \"-\"), expectedType:(meta.expectedType || \"-\"), recordingState:(cd ? \"countdown_cancelled\" : \"ready\"), lastSavedCsv:(flow.get(\"lastSavedCsv\") || \"-\")}}\n];",
+    "outputs": 3,
+    "noerr": 0,
+    "x": 650,
+    "y": 840,
+    "wires": [
+      [],
+      [
+        "ui_status"
+      ],
+      [
+        "fn_readiness"
+      ]
+    ]
+  },
+  {
+    "id": "status_mqtt",
+    "type": "status",
+    "z": "tab_fall_sensor_lab",
+    "name": "mqtt status",
+    "scope": [
+      "mqtt_lab_imu"
+    ],
+    "x": 650,
+    "y": 920,
+    "wires": [
+      [
+        "fn_conn"
+      ]
+    ]
+  },
+  {
+    "id": "fn_conn",
+    "type": "function",
+    "z": "tab_fall_sensor_lab",
+    "name": "Conn Status",
+    "func": "\nvar s = msg.status || {};\nvar txt = s.text || \"\";\nvar fill = s.fill || \"grey\";\nvar connected = (fill === \"green\");\nflow.set(\"mqttConnected\", connected);\nreturn {payload:{items:[{label:\"MQTT\", value:(connected ? \"connected\" : (txt || \"disconnected\")), color:(connected ? \"green\" : \"red\")}]}};\n",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 650,
+    "y": 980,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "fn_live",
+    "type": "function",
+    "z": "tab_fall_sensor_lab",
+    "name": "Live Values + Chart",
+    "func": "\n// แสดงค่า sensor ล่าสุด + ป้อนกราฟ (display-only ไม่ยุ่ง recording)\nvar p = msg.payload;\nif (typeof p === \"string\") { try { p = JSON.parse(p); } catch (e) { return null; } }\nif (!p || typeof p !== \"object\") return null;\nfunction n(v){ return (v === undefined || v === null || v === \"\") ? \"-\" : v; }\nfunction d(v, dp, unit){ var x = Number.parseFloat(v); return Number.isFinite(x) ? x.toFixed(dp) + (unit || \"\") : \"-\"; }\nfunction point(topic, value, dp){\n    var x = Number.parseFloat(value);\n    return Number.isFinite(x) ? {topic: topic, payload: Number(x.toFixed(dp))} : null;\n}\nflow.set(\"lastLabMsgTs\", Date.now());\nif (p.type === \"imu_sample\") flow.set(\"lastImuSampleTs\", Date.now());\nvar live = { groups: [\n    {title:\"Acceleration\", items:[{label:\"AX\", value:d(p.ax,3,\"g\")}, {label:\"AY\", value:d(p.ay,3,\"g\")}, {label:\"AZ\", value:d(p.az,3,\"g\")}]},\n    {title:\"Gyroscope\", items:[{label:\"GX\", value:d(p.gx,2,\"dps\")}, {label:\"GY\", value:d(p.gy,2,\"dps\")}, {label:\"GZ\", value:d(p.gz,2,\"dps\")}]},\n    {title:\"Impact\", items:[{label:\"Magnitude (SVM)\", value:d(p.svmFiltered,3,\"g\")}, {label:\"Threshold\", value:d(p.impactThreshold,3,\"g\")}]},\n    {title:\"Posture\", items:[{label:\"Pitch\", value:d(p.pitch,2,\"deg\")}, {label:\"Roll\", value:d(p.roll,2,\"deg\")}, {label:\"Delta\", value:d(p.postureDelta,2,\"deg\")}, {label:\"Threshold\", value:d(p.postureThreshold,2,\"deg\")}]},\n    {title:\"Decision\", items:[{label:\"Type\", value:n(p.type)}, {label:\"State\", value:n(p.state)}, {label:\"Action\", value:n(p.decision)}]}\n]};\nreturn [\n    {payload: live},\n    point(\"Magnitude (SVM)\", p.svmFiltered, 3),\n    point(\"Pitch\", p.pitch, 2),\n    point(\"Roll\", p.roll, 2),\n    point(\"Delta\", p.postureDelta, 2),\n    point(\"Impact Threshold\", p.impactThreshold, 3),\n    point(\"Posture Threshold\", p.postureThreshold, 2),\n    {payload: {items:[{label:\"Device stream\", value:\"device/+/lab/imu (\"+n(p.type)+\")\", color:\"green\"}]}},\n    // กราฟ Acceleration (รวม 3 แกน: AX, AY, AZ)\n    [point(\"AX\", p.ax, 3), point(\"AY\", p.ay, 3), point(\"AZ\", p.az, 3)],\n    // กราฟ Gyroscope (รวม 3 แกน: GX, GY, GZ)\n    [point(\"GX\", p.gx, 2), point(\"GY\", p.gy, 2), point(\"GZ\", p.gz, 2)]\n];\n",
+    "outputs": 10,
+    "noerr": 0,
+    "x": 650,
+    "y": 1060,
+    "wires": [
+      [
+        "ui_live"
+      ],
+      [
+        "ui_chart_impact"
+      ],
+      [
+        "ui_chart_attitude"
+      ],
+      [
+        "ui_chart_attitude"
+      ],
+      [
+        "ui_chart_attitude"
+      ],
+      [
+        "ui_chart_impact"
+      ],
+      [
+        "ui_chart_attitude"
+      ],
+      [],
+      [
+        "ui_chart_ac"
+      ],
+      [
+        "ui_chart_gy"
+      ]
+    ]
+  },
+  {
+    "id": "ui_live",
+    "type": "ui-template",
+    "z": "tab_fall_sensor_lab",
+    "group": "ui_grp_live",
+    "order": 1,
+    "width": 12,
+    "height": 0,
+    "name": "Live Sensor Values",
+    "format": "<template>\n    <div class=\"fh-panel fh-live\">\n        <div class=\"fh-section\" v-for=\"group in groups\" :key=\"group.title\">\n            <div class=\"fh-section-title\">{{ group.title }}</div>\n            <div class=\"fh-live-grid\">\n                <div class=\"fh-field\" v-for=\"item in group.items\" :key=\"group.title + item.label\" :data-label=\"item.label\">\n                    <span class=\"fh-label\">{{ item.label }}</span>\n                    <strong class=\"fh-value\">{{ item.value }}</strong>\n                </div>\n            </div>\n        </div>\n    </div>\n</template>\n<script>\n    export default {\n        computed: {\n            groups() { return (this.msg && this.msg.payload && this.msg.payload.groups) || [] }\n        }\n    }\n</script>\n<style>\n    .fh-panel { width: 100%; max-width: 100%; overflow: hidden; color: #1e293b; font-family: sans-serif; }\n    \n    .fh-section { margin-bottom: 16px; }\n    .fh-section-title { margin: 0 0 8px; color: #475569; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }\n    \n    /* Responsive grid for Live Sensor */\n    .fh-live-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; }\n    \n    .fh-field { \n        display: flex; flex-direction: column; \n        background: #f8fafc; border-radius: 6px; \n        padding: 8px 12px; \n        border: 1px solid #e2e8f0;\n        box-shadow: 0 1px 2px rgba(0,0,0,0.05);\n    }\n    \n    .fh-label { color: #64748b; font-size: 11px; font-weight: 700; margin-bottom: 2px; text-transform: uppercase; }\n    .fh-value { color: #0f172a; font-size: 17px; font-weight: 700; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }\n</style>",
+    "className": "operator-live",
+    "x": 900,
+    "y": 220,
+    "wires": [],
+    "storeOutMessages": true,
+    "passthru": true,
+    "resendOnRefresh": true,
+    "templateScope": "local"
+  },
+  {
+    "id": "ui_chart_impact",
+    "type": "ui-chart",
+    "z": "tab_fall_sensor_lab",
+    "group": "ui_grp_analytics",
+    "name": "Impact Magnitude (SVM)",
+    "label": "Impact Magnitude (SVM)",
+    "order": 1,
+    "width": 6,
+    "height": 5,
+    "chartType": "line",
+    "category": "topic",
+    "categoryType": "msg",
+    "line": "",
+    "interpolation": "linear",
+    "xAxisType": "time",
+    "xAxisFormat": "",
+    "xAxisLabel": "Time",
+    "yAxisLabel": "SVM Filtered (g)",
+    "action": "append",
+    "stackSeries": false,
+    "pointShape": "circle",
+    "pointRadius": 4,
+    "showLegend": true,
+    "removeOlder": "30",
+    "removeOlderUnit": "1",
+    "removeOlderPoints": "",
+    "colors": [
+      "#2563eb",
+      "#dc2626"
+    ],
+    "useOneColor": false,
+    "className": "",
+    "x": 900,
+    "y": 280,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "ui_chart_attitude",
+    "type": "ui-chart",
+    "z": "tab_fall_sensor_lab",
+    "group": "ui_grp_analytics",
+    "name": "Attitude & Posture Delta",
+    "label": "Attitude & Posture Delta",
+    "order": 2,
+    "width": 6,
+    "height": 5,
+    "chartType": "line",
+    "category": "topic",
+    "categoryType": "msg",
+    "line": "",
+    "interpolation": "linear",
+    "xAxisType": "time",
+    "xAxisFormat": "",
+    "xAxisLabel": "Time",
+    "yAxisLabel": "Degrees (deg)",
+    "action": "append",
+    "stackSeries": false,
+    "pointShape": "circle",
+    "pointRadius": 4,
+    "showLegend": true,
+    "removeOlder": "30",
+    "removeOlderUnit": "1",
+    "removeOlderPoints": "",
+    "colors": [
+      "#16a34a",
+      "#f97316",
+      "#7c3aed",
+      "#dc2626"
+    ],
+    "useOneColor": false,
+    "className": "",
+    "x": 900,
+    "y": 340,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "inj_status_tick",
+    "type": "inject",
+    "z": "tab_fall_sensor_lab",
+    "name": "Status Tick (1s)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "1",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "0.2",
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 150,
+    "y": 220,
+    "wires": [
+      [
+        "fn_readiness"
+      ]
+    ]
+  },
+  {
+    "id": "fn_readiness",
+    "type": "function",
+    "z": "tab_fall_sensor_lab",
+    "name": "Combined Trial & System Info",
+    "func": "// รวม System Status + Trial Metadata เป็น output เดียว (tick ทุก 1 วิ)\nvar now = Date.now();\nvar lab = flow.get(\"lastLabMsgTs\");\nvar samp = flow.get(\"lastImuSampleTs\");\nvar mq = flow.get(\"mqttConnected\") === true;\nvar rec = flow.get(\"recording\") === true;\nvar cd = flow.get(\"countdownActive\") === true;\nvar left = flow.get(\"countdownLeft\");\nvar meta = flow.get(\"trialMeta\") || {};\nvar labAgo = lab ? (now - lab) : null;\nvar sampAgo = samp ? (now - samp) : null;\nvar dev = (labAgo === null || labAgo > 10000) ? \"Offline\" : (labAgo <= 3000 ? \"Online\" : \"Stale\");\nvar imuRecent = sampAgo !== null && sampAgo <= 3000;\nvar imu = imuRecent ? \"recent\" : (sampAgo === null ? \"unknown\" : \"stale\");\nvar warning = imuRecent ? \"OK\" : \"Warning: No recent IMU sample\";\n\nvar sid = meta.sessionId || flow.get(\"sessionId\") || \"-\";\nvar nextId = \"T\" + (\"\" + ((flow.get(\"trialSeq\") || 0) + 1)).padStart(2, \"0\");\nvar tid = meta.trialId || (sid !== \"-\" ? nextId : \"-\");\nvar activity = meta.activityLabel || \"-\";\nvar expected = meta.expectedType || \"-\";\nvar lastCsv = flow.get(\"lastSavedCsv\") || \"-\";\n\n// ดึงข้อมูลจำนวนท่าที่ทำเสร็จแล้ว\nvar completedActs = flow.get(\"completedActivities\") || [];\nvar sidDisplay = sid;\nif (sid !== \"-\" && completedActs.length > 0) {\n    sidDisplay += \" (เสร็จแล้ว \" + completedActs.length + \" ท่า)\";\n}\n\nvar state = rec ? \"recording\" : (cd ? (\"countdown\" + (left !== undefined && left !== null ? \" (\" + left + \"s)\" : \"\")) : (sid === \"-\" ? \"wait_session\" : \"ready\"));\n\nfunction p2(x){ return (\"\" + x).padStart(2, \"0\"); }\nfunction age(x){ return x === null ? \"-\" : Math.round(x / 1000) + \"s\"; }\nfunction color(kind, value) {\n    if (kind === \"recording\") return value === \"recording\" ? \"blue\" : (value === \"countdown\" ? \"yellow\" : (value === \"wait_session\" ? \"gray\" : \"green\"));\n    if (value === true || value === \"Online\" || value === \"recent\" || value === \"OK\") return \"green\";\n    if (value === \"Stale\" || value === \"stale\" || value === \"countdown\") return \"yellow\";\n    if (value === false || value === \"Offline\" || value === \"disconnected\") return \"red\";\n    return \"gray\";\n}\nvar seen = \"-\";\nif (labAgo !== null) {\n    var dt = new Date(lab);\n    seen = p2(dt.getHours()) + \":\" + p2(dt.getMinutes()) + \":\" + p2(dt.getSeconds());\n}\n\nvar statusItems = [\n    {label:\"MQTT\", value: mq ? \"connected\" : \"disconnected\", color: color(\"MQTT\", mq)},\n    {label:\"Device\", value: dev, color: color(\"Device\", dev)}\n];\nif (dev === \"Online\" || dev === \"Stale\") {\n    statusItems.push({label:\"IMU\", value: imu, color: color(\"IMU\", imu)});\n    if (warning !== \"OK\") {\n        statusItems.push({label:\"Warning\", value: warning, color: \"yellow\"});\n    }\n}\n\nvar detailItems = [\n    {label:\"Last seen\", value: seen},\n    {label:\"Last seen age\", value: age(labAgo)},\n    {label:\"Current activity\", value: activity},\n    {label:\"Current expected type\", value: expected},\n    {label:\"Next trial ID\", value: nextId},\n    {label:\"Topic\", value: \"device/+/lab/imu\"}\n];\nvar trialItems = [\n    {label:\"Session\", value: sidDisplay},\n    {label:\"Trial\", value: tid},\n    {label:\"Activity\", value: activity},\n    {label:\"Expected\", value: expected},\n    {label:\"State\", value: state, color: color(\"recording\", state)},\n    {label:\"Last CSV\", value: lastCsv}\n];\nnode.status({fill: dev === \"Online\" ? \"green\" : (dev === \"Stale\" ? \"yellow\" : \"red\"), shape: \"dot\", text: dev});\nreturn {payload: {statusItems: statusItems, detailItems: detailItems, trialItems: trialItems, items: statusItems.concat(detailItems)}};",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 650,
+    "y": 1140,
+    "wires": [
+      [
+        "ui_trial_meta"
+      ]
+    ]
+  },
+  {
+    "id": "ui_trial_meta",
+    "type": "ui-template",
+    "z": "tab_fall_sensor_lab",
+    "group": "ui_grp_meta",
+    "order": 1,
+    "width": 6,
+    "height": 6,
+    "name": "Trial & System Info",
+    "format": "<template>\n    <div class=\"fh-panel\">\n        <div class=\"fh-header\" style=\"display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px dashed #cbd5e1;\">\n            <div class=\"fh-status-bar\" style=\"margin-bottom:0; padding-bottom:0; border-bottom:none;\">\n                <div class=\"fh-badge\" v-for=\"s in statusItems\" :key=\"s.label\">\n                    <span :class=\"'fh-dot fh-dot--' + s.color\"></span>\n                    <span class=\"fh-badge-label\">{{ s.label }}</span>\n                    <span class=\"fh-badge-value\">{{ s.value }}</span>\n                </div>\n            </div>\n            <div class=\"fh-thai-time\" style=\"font-weight: 700; color: #0f172a; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 14px; background: #e2e8f0; padding: 6px 12px; border-radius: 6px; white-space: nowrap;\">\n                {{ thaiTime }}\n            </div>\n        </div>\n        <div class=\"fh-meta-grid\">\n            <div class=\"fh-field\" v-for=\"t in trialItems\" :key=\"t.label\">\n                <span v-if=\"t.color\" :class=\"'fh-dot fh-dot--' + t.color\" style=\"position:absolute; top: 12px; right: 12px;\"></span>\n                <span class=\"fh-label\">{{ t.label }}</span>\n                <strong class=\"fh-value\">{{ t.value }}</strong>\n            </div>\n        </div>\n    </div>\n</template>\n<script>\n    export default {\n        data() {\n            return {\n                thaiTime: '',\n                timer: null\n            }\n        },\n        computed: {\n            statusItems() { return (this.msg && this.msg.payload && this.msg.payload.statusItems) || [] },\n            trialItems() { return (this.msg && this.msg.payload && this.msg.payload.trialItems) || [] }\n        },\n        mounted() {\n            this.updateTime();\n            this.timer = setInterval(this.updateTime, 1000);\n        },\n        unmounted() {\n            if (this.timer) clearInterval(this.timer);\n        },\n        methods: {\n            updateTime() {\n                // Format current time in Thai time zone (Asia/Bangkok)\n                const options = { timeZone: 'Asia/Bangkok', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };\n                this.thaiTime = new Date().toLocaleTimeString('th-TH', options) + ' TH';\n            }\n        }\n    }\n</script>\n<style>\n    .fh-panel { width: 100%; max-width: 100%; overflow: hidden; color: #1e293b; font-family: sans-serif; }\n    .fh-status-bar { display: flex; flex-wrap: wrap; gap: 10px; }\n    .fh-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 16px; background: #f1f5f9; font-size: 13px; white-space: nowrap; border: 1px solid #e2e8f0; }\n    .fh-badge-label { font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }\n    .fh-badge-value { color: #0f172a; font-weight: 800; }\n    \n    /* Responsive grid for Trial Info */\n    .fh-meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }\n    @media (max-width: 768px) {\n        .fh-meta-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }\n        .fh-field { padding: 8px 10px; }\n        .fh-label { font-size: 10px; margin-bottom: 2px; }\n        .fh-value { font-size: 14px; }\n        .fh-header { margin-bottom: 12px !important; padding-bottom: 10px !important; }\n        .fh-badge { padding: 4px 10px; font-size: 12px; }\n    }\n    \n    .fh-field { \n        position: relative;\n        display: flex; flex-direction: column; \n        background: #f8fafc; border-radius: 6px; \n        padding: 12px 14px; \n        border: 1px solid #e2e8f0;\n        box-shadow: 0 1px 2px rgba(0,0,0,0.05);\n    }\n    \n    .fh-label { color: #64748b; font-size: 11px; font-weight: 700; margin-bottom: 4px; text-transform: uppercase; }\n    .fh-value { color: #0f172a; font-size: 16px; font-weight: 700; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n\n    .fh-dot { width: 10px; height: 10px; border-radius: 999px; flex: 0 0 auto; }\n    .fh-dot--green { background: #22c55e; }\n    .fh-dot--yellow { background: #f59e0b; }\n    .fh-dot--red { background: #ef4444; }\n    .fh-dot--blue { background: #3b82f6; }\n    .fh-dot--gray { background: #94a3b8; }\n</style>",
+    "className": "operator-info",
+    "x": 900,
+    "y": 400,
+    "wires": [],
+    "storeOutMessages": true,
+    "passthru": true,
+    "resendOnRefresh": true,
+    "templateScope": "local"
+  },
+  {
+    "id": "ui_base_334",
+    "type": "ui-base",
+    "name": "Fall Detection Sensor Lab Dashboard",
+    "path": "/ui",
+    "includeClientData": true,
+    "acceptsClientConfig": [
+      "ui-notification",
+      "ui-control"
+    ],
+    "showPathInSidebar": false,
+    "headerContent": "page",
+    "navigationStyle": "default",
+    "titleBarStyle": "default"
+  },
+  {
+    "id": "ui_theme_334",
+    "type": "ui-theme",
+    "name": "Default Theme",
+    "colors": {
+      "surface": "#ffffff",
+      "primary": "#0094ce",
+      "bgPage": "#eeeeee",
+      "groupBg": "#ffffff",
+      "groupOutline": "#cccccc"
+    },
+    "sizes": {
+      "density": "default",
+      "pagePadding": "12px",
+      "groupGap": "12px",
+      "groupBorderRadius": "4px",
+      "widgetGap": "12px"
+    }
+  },
+  {
+    "id": "ui_page_334",
+    "type": "ui-page",
+    "name": "Fall Detection Sensor Lab",
+    "ui": "ui_base_334",
+    "path": "/fall-detection-sensor-lab",
+    "icon": "home",
+    "layout": "grid",
+    "theme": "ui_theme_334",
+    "breakpoints": [
+      {
+        "name": "Default",
+        "px": "0",
+        "cols": "3"
+      },
+      {
+        "name": "Tablet",
+        "px": "576",
+        "cols": "6"
+      },
+      {
+        "name": "Desktop",
+        "px": "768",
+        "cols": "9"
+      },
+      {
+        "name": "Widescreen",
+        "px": "1024",
+        "cols": "12"
+      }
+    ],
+    "order": 1,
+    "className": "",
+    "visible": "true",
+    "disabled": "false"
+  },
+  {
+    "id": "inj_dashboard_defaults",
+    "type": "inject",
+    "z": "tab_fall_sensor_lab",
+    "name": "Dashboard Defaults",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "0.3",
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 150,
+    "y": 280,
+    "wires": [
+      [
+        "fn_dashboard_defaults"
+      ]
+    ]
+  },
+  {
+    "id": "fn_dashboard_defaults",
+    "type": "function",
+    "z": "tab_fall_sensor_lab",
+    "name": "Dashboard Default Placeholders",
+    "func": "\n// แสดงค่า default หลัง deploy โดยไม่เปลี่ยน trial/save state\nreturn [\n  {payload:{lastSavedCsv:\"-\"}},\n  {payload:{groups:[\n    {title:\"Acceleration\", items:[{label:\"AX\", value:\"-\"}, {label:\"AY\", value:\"-\"}, {label:\"AZ\", value:\"-\"}]},\n    {title:\"Gyroscope\", items:[{label:\"GX\", value:\"-\"}, {label:\"GY\", value:\"-\"}, {label:\"GZ\", value:\"-\"}]},\n    {title:\"Impact\", items:[{label:\"Magnitude (SVM)\", value:\"-\"}, {label:\"Threshold\", value:\"-\"}]},\n    {title:\"Posture\", items:[{label:\"Pitch\", value:\"-\"}, {label:\"Roll\", value:\"-\"}, {label:\"Delta\", value:\"-\"}, {label:\"Threshold\", value:\"-\"}]},\n    {title:\"Decision\", items:[{label:\"Type\", value:\"-\"}, {label:\"State\", value:\"-\"}, {label:\"Action\", value:\"-\"}]}\n]}}\n];\n",
+    "outputs": 2,
+    "noerr": 0,
+    "x": 650,
+    "y": 1220,
+    "wires": [
+      [
+        "fn_readiness"
+      ],
+      [
+        "ui_live"
+      ]
+    ]
+  },
+  {
+    "id": "ui_trial_normal_header",
+    "type": "ui-template",
+    "z": "tab_fall_sensor_lab",
+    "group": "ui_grp_ctrl",
+    "order": 6,
+    "width": 3,
+    "height": 1,
+    "name": "Normal / Daily Activities",
+    "format": "<template>\n    <div class=\"fh-trial-heading\">Normal / Daily Activities</div>\n</template>\n<style>\n    .fh-trial-heading { min-height: 36px; display: flex; align-items: center; justify-content: center; border: 1px solid #d9e1ec; border-radius: 6px; background: #f8fafc; color: #344054; font-size: 13px; font-weight: 800; }\n</style>",
+    "className": "operator-trial-section",
+    "x": 900,
+    "y": 460,
+    "wires": [],
+    "storeOutMessages": true,
+    "passthru": true,
+    "resendOnRefresh": true,
+    "templateScope": "local"
+  },
+  {
+    "id": "ui_trial_fall_header",
+    "type": "ui-template",
+    "z": "tab_fall_sensor_lab",
+    "group": "ui_grp_ctrl",
+    "order": 7,
+    "width": 3,
+    "height": 1,
+    "name": "Fall Simulations",
+    "format": "<template>\n    <div class=\"fh-trial-heading\">Fall Simulations</div>\n</template>\n<style>\n    .fh-trial-heading { min-height: 36px; display: flex; align-items: center; justify-content: center; border: 1px solid #d9e1ec; border-radius: 6px; background: #f8fafc; color: #344054; font-size: 13px; font-weight: 800; }\n</style>",
+    "className": "operator-trial-section",
+    "x": 900,
+    "y": 520,
+    "wires": [],
+    "storeOutMessages": true,
+    "passthru": true,
+    "resendOnRefresh": true,
+    "templateScope": "local"
+  },
+  {
+    "id": "ui_chart_ac",
+    "type": "ui-chart",
+    "z": "tab_fall_sensor_lab",
+    "group": "ui_grp_chart",
+    "name": "Acceleration (AX, AY, AZ)",
+    "label": "Acceleration (AX, AY, AZ)",
+    "order": 1,
+    "width": 6,
+    "height": 6,
+    "chartType": "line",
+    "category": "topic",
+    "categoryType": "msg",
+    "line": "",
+    "interpolation": "linear",
+    "xAxisType": "time",
+    "xAxisLabel": "Time",
+    "yAxisLabel": "Acceleration (g)",
+    "action": "append",
+    "stackSeries": false,
+    "pointShape": "circle",
+    "pointRadius": 2,
+    "showLegend": true,
+    "removeOlder": "30",
+    "removeOlderUnit": "1",
+    "colors": [
+      "#ef4444",
+      "#22c55e",
+      "#3b82f6"
+    ],
+    "x": 900,
+    "y": 580,
+    "wires": [
+      []
+    ],
+    "ymin": "-4",
+    "ymax": "4"
+  },
+  {
+    "id": "ui_chart_gy",
+    "type": "ui-chart",
+    "z": "tab_fall_sensor_lab",
+    "group": "ui_grp_chart",
+    "name": "Gyroscope (GX, GY, GZ)",
+    "label": "Gyroscope (GX, GY, GZ)",
+    "order": 2,
+    "width": 6,
+    "height": 6,
+    "chartType": "line",
+    "category": "topic",
+    "categoryType": "msg",
+    "line": "",
+    "interpolation": "linear",
+    "xAxisType": "time",
+    "xAxisLabel": "Time",
+    "yAxisLabel": "Gyroscope (deg/s)",
+    "action": "append",
+    "stackSeries": false,
+    "pointShape": "circle",
+    "pointRadius": 2,
+    "showLegend": true,
+    "removeOlder": "30",
+    "removeOlderUnit": "1",
+    "colors": [
+      "#ef4444",
+      "#22c55e",
+      "#3b82f6"
+    ],
+    "x": 900,
+    "y": 640,
+    "wires": [
+      []
+    ],
+    "ymin": "-500",
+    "ymax": "500"
+  },
+  {
+    "id": "ui_grp_analytics",
+    "type": "ui-group",
+    "name": "Live Charts (Analytics)",
+    "page": "ui_page_334",
+    "width": "12",
+    "order": 5,
+    "showTitle": true,
+    "className": "",
+    "visible": true,
+    "disabled": false
+  },
+  {
+    "id": "ui_mqtt_log",
+    "type": "ui-template",
+    "z": "tab_fall_sensor_lab",
+    "group": "ui_grp_meta",
+    "order": 2,
+    "width": 6,
+    "height": 4,
+    "name": "MQTT Activity Log",
+    "format": "<template>\n    <div class=\"fh-mqtt-log\">\n        <div class=\"fh-log-header\">\n            <span class=\"fh-log-title\">MQTT & System Log (Sampled)</span>\n            <span class=\"fh-log-pulse\" :class=\"{'active': isPulsing}\"></span>\n        </div>\n        <div class=\"fh-log-content\" ref=\"logContent\">\n            <div v-for=\"(line, idx) in logs\" :key=\"idx\" class=\"fh-log-line\">\n                <span class=\"fh-log-time\">{{ line.time }}</span>\n                <span class=\"fh-log-msg\" :class=\"'fh-log-msg--' + line.type\">{{ line.msg }}</span>\n            </div>\n            <div v-if=\"logs.length === 0\" class=\"fh-log-empty\">Waiting for MQTT data...</div>\n        </div>\n    </div>\n</template>\n\n<script>\n    export default {\n        data() {\n            return {\n                logs: [],\n                isPulsing: false,\n                pulseTimeout: null\n            }\n        },\n        watch: {\n            msg(m) {\n                if (m && m.payload) {\n                    const now = new Date();\n                    const timeStr = now.getHours().toString().padStart(2, '0') + ':' + \n                                  now.getMinutes().toString().padStart(2, '0') + ':' + \n                                  now.getSeconds().toString().padStart(2, '0');\n                    \n                    let logType = \"info\";\n                    let logMsg = \"\";\n                    \n                    if (typeof m.payload === \"string\") {\n                        logMsg = m.payload;\n                    } else if (typeof m.payload === \"object\") {\n                        if (m.payload.type === \"imu_sample\") {\n                            logType = \"imu\";\n                            logMsg = \"IMU Sample: ax=\" + m.payload.ax.toFixed(2) + \" ay=\" + m.payload.ay.toFixed(2) + \" az=\" + m.payload.az.toFixed(2);\n                        } else {\n                            logMsg = JSON.stringify(m.payload);\n                        }\n                    }\n                    \n                    this.logs.push({ time: timeStr, msg: logMsg, type: logType });\n                    if (this.logs.length > 50) this.logs.shift(); // Keep last 50 lines\n                    \n                    // Pulse animation\n                    this.isPulsing = true;\n                    clearTimeout(this.pulseTimeout);\n                    this.pulseTimeout = setTimeout(() => { this.isPulsing = false; }, 200);\n                    \n                    // Auto-scroll to bottom\n                    this.$nextTick(() => {\n                        const el = this.$refs.logContent;\n                        if (el) el.scrollTop = el.scrollHeight;\n                    });\n                }\n            }\n        }\n    }\n</script>\n\n<style>\n    .fh-mqtt-log {\n        display: flex; flex-direction: column;\n        height: 100%;\n        background: #0f172a;\n        border-radius: 6px;\n        border: 1px solid #1e293b;\n        color: #cbd5e1;\n        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;\n        overflow: hidden;\n    }\n    .fh-log-header {\n        display: flex; justify-content: space-between; align-items: center;\n        background: #1e293b;\n        padding: 6px 12px;\n        border-bottom: 1px solid #334155;\n    }\n    .fh-log-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; }\n    .fh-log-pulse { width: 8px; height: 8px; border-radius: 50%; background: #475569; transition: background 0.1s; }\n    .fh-log-pulse.active { background: #22c55e; box-shadow: 0 0 8px #22c55e; }\n    \n    .fh-log-content {\n        flex: 1;\n        overflow-y: auto;\n        padding: 8px 12px;\n        font-size: 12px;\n        line-height: 1.5;\n    }\n    .fh-log-content::-webkit-scrollbar { width: 6px; }\n    .fh-log-content::-webkit-scrollbar-track { background: transparent; }\n    .fh-log-content::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }\n    \n    .fh-log-line { display: flex; gap: 8px; margin-bottom: 4px; word-break: break-all; }\n    .fh-log-time { color: #64748b; flex-shrink: 0; }\n    .fh-log-msg { color: #e2e8f0; }\n    .fh-log-msg--imu { color: #38bdf8; }\n    .fh-log-empty { color: #475569; font-style: italic; text-align: center; margin-top: 20px; }\n</style>",
+    "className": "",
+    "x": 900,
+    "y": 700,
+    "wires": [],
+    "storeOutMessages": false,
+    "passthru": true,
+    "resendOnRefresh": false,
+    "templateScope": "local"
+  },
+  {
+    "id": "fn_throttle_log",
+    "type": "function",
+    "z": "tab_fall_sensor_lab",
+    "name": "Throttle MQTT for Log",
+    "func": "\nvar now = Date.now();\nvar last = context.get(\"lastLogTs\") || 0;\n// Only pass 1 message per second to prevent browser lag\nif (now - last >= 1000) {\n    context.set(\"lastLogTs\", now);\n    return msg;\n}\nreturn null;\n",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 650,
+    "y": 1300,
+    "wires": [
+      [
+        "ui_mqtt_log"
+      ]
+    ]
+  },
+  {
+    "id": "ui_workflow_note",
+    "type": "ui-template",
+    "z": "tab_fall_sensor_lab",
+    "group": "ui_grp_ctrl",
+    "order": 4,
+    "width": 6,
+    "height": 3,
+    "name": "Workflow Note",
+    "format": "<template>\n    <div style=\"font-size: 12px; color: #475569; line-height: 1.5; padding: 8px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid #e2e8f0;\">\n        <strong style=\"color: #0f172a; font-size: 13px;\">📝 ขั้นตอนเก็บข้อมูล</strong><br>\n        1. เลือก Session หรือกรอกใหม่ แล้วกด <b>บันทึก</b><br>\n        2. ตรวจสอบว่า <b style=\"color:#16a34a;\">Device = Online</b> ก่อนเริ่ม<br>\n        3. กดเลือกท่า → T จะรันอัตโนมัติ<br>\n        4. รอนับถอยหลัง 10s (ดูช่อง STATE) แล้วทำท่า<br>\n        5. ทำท่าเสร็จให้กด <b style=\"color:#dc2626;\">Stop Trial</b>\n    </div>\n</template>",
+    "storeOutMessages": false,
+    "passthru": true,
+    "resendOnRefresh": false,
+    "templateScope": "local",
+    "className": "",
+    "x": 150,
+    "y": 850,
+    "wires": []
+  },
+  {
+    "id": "ui_error_toast",
+    "type": "ui-notification",
+    "z": "tab_fall_sensor_lab",
+    "ui": "ui_base_334",
+    "position": "top right",
+    "displayTime": "4",
+    "showCountdown": true,
+    "name": "Error Toast",
+    "x": 900,
+    "y": 760,
+    "wires": []
+  },
+  {
+    "id": "fn_scan_sessions",
+    "type": "function",
+    "z": "tab_fall_sensor_lab",
+    "name": "Scan Sessions",
+    "func": "// อ่านโฟลเดอร์ /data/runs/ แล้วส่งรายการ session ที่มีอยู่\n// fsMod มาจาก functionExternalModules (require('fs'))\nvar runsDir = flow.get('runsDir') || '/data/runs';\nvar options = [];\ntry {\n    var dirs = fsMod.readdirSync(runsDir);\n    dirs.filter(function(d) {\n        try { return fsMod.statSync(runsDir + '/' + d).isDirectory(); }\n        catch(e) { return false; }\n    }).sort().reverse().forEach(function(d) {\n        options.push({ value: d, label: d });\n    });\n} catch(e) {\n    node.warn('scan sessions error: ' + e.message);\n}\nif (options.length === 0) {\n    options.push({ value: '', label: '— ยังไม่มี Session —' });\n}\nvar sid = flow.get('sessionId');\nvar hasSid = options.some(function(o) { return o.value === sid; });\nvar finalPayload = hasSid ? sid : options[0].value;\n\nreturn { options: options, payload: finalPayload };",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 650,
+    "y": 1380,
+    "wires": [
+      [
+        "ui_session_dropdown"
+      ]
+    ],
+    "libs": [
+      {
+        "var": "fsMod",
+        "module": "fs"
+      }
+    ]
+  },
+  {
+    "id": "inj_scan_sessions",
+    "type": "inject",
+    "z": "tab_fall_sensor_lab",
+    "name": "Scan Sessions (30s)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "30",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "0.5",
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 150,
+    "y": 340,
+    "wires": [
+      [
+        "fn_scan_sessions"
+      ]
+    ]
+  },
+  {
+    "id": "ui_session_dropdown",
+    "type": "ui-dropdown",
+    "z": "tab_fall_sensor_lab",
+    "group": "ui_grp_ctrl",
+    "name": "เลือก Session ที่มีอยู่",
+    "label": "เลือก Session ที่มีอยู่",
+    "tooltip": "เลือก Session ที่เคยสร้างไว้ เพื่อเพิ่ม Trial ต่อ",
+    "order": 1,
+    "width": 4,
+    "height": 1,
+    "passthru": false,
+    "multiple": false,
+    "chips": false,
+    "clearable": true,
+    "options": [
+      {
+        "value": "",
+        "label": "— ยังไม่มี Session —"
+      }
+    ],
+    "payload": "",
+    "topic": "sessionId",
+    "topicType": "str",
+    "className": "",
+    "x": 900,
+    "y": 820,
+    "wires": [
+      [
+        "fn_session_from_dropdown"
+      ]
+    ]
+  },
+  {
+    "id": "fn_session_from_dropdown",
+    "type": "function",
+    "z": "tab_fall_sensor_lab",
+    "name": "Session From Dropdown",
+    "func": "\n// Dropdown ส่ง msg.payload = session folder name (เช่น \"S01\")\nvar sid = (msg.payload || \"\").trim();\nif (!sid) return null; // ถ้าเลือกว่าง ไม่ทำอะไร\n// ส่งต่อในรูป {sessionId: sid} เหมือน ui-form\nreturn { payload: { sessionId: sid } };\n",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 650,
+    "y": 1460,
+    "wires": [
+      [
+        "fn_session"
+      ]
+    ]
+  },
+  {
+    "id": "ui_btn_refresh_sessions",
+    "type": "ui-button",
+    "z": "tab_fall_sensor_lab",
+    "group": "ui_grp_ctrl",
+    "name": "รีเฟรช Session",
+    "label": "🔄",
+    "tooltip": "รีเฟรชรายการ Session",
+    "order": 2,
+    "width": 2,
+    "height": 1,
+    "payload": "refresh",
+    "payloadType": "str",
+    "topic": "refresh",
+    "topicType": "str",
+    "buttonColor": "",
+    "textColor": "",
+    "className": "",
+    "icon": "",
+    "iconPosition": "left",
+    "x": 150,
+    "y": 600,
+    "wires": [
+      [
+        "fn_scan_sessions"
+      ]
+    ]
+  },
+  {
+    "id": "dbg_session",
+    "type": "debug",
+    "z": "tab_fall_sensor_lab",
+    "name": "Debug Form Output",
+    "active": true,
+    "tosidebar": true,
+    "console": true,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 900,
+    "y": 880,
+    "wires": []
+  },
+  {
+    "id": "ui_tooltip_inject",
+    "type": "ui-template",
+    "z": "tab_fall_sensor_lab",
+    "group": "",
+    "page": "ui_page_334",
+    "ui": "",
+    "name": "Tooltip Injector",
+    "order": 0,
+    "width": 0,
+    "height": 0,
+    "head": "",
+    "format": "<template>\n<style>\n/* ให้ตัวหนังสือในปุ่ม Activity ตัดบรรทัดและพอดีกับจอมือถือ */\n.v-btn__content {\n    white-space: normal !important;\n    text-align: center;\n    line-height: 1.2 !important;\n    padding: 2px 0;\n}\n@media (max-width: 600px) {\n    .v-btn__content {\n        font-size: 11px !important;\n    }\n}\n\n/* Tooltip wrapper สำหรับ activity buttons */\n.nrdb-tooltip-wrap {\n    position: relative;\n    display: contents;\n}\n[data-nr-tooltip] {\n    position: relative;\n}\n[data-nr-tooltip]::after {\n    content: attr(data-nr-tooltip);\n    position: absolute;\n    bottom: calc(100% + 6px);\n    left: 50%;\n    transform: translateX(-50%);\n    background: rgba(15,23,42,0.95);\n    color: #f1f5f9;\n    font-size: 12px;\n    line-height: 1.4;\n    padding: 6px 10px;\n    border-radius: 6px;\n    white-space: pre-wrap;\n    max-width: 220px;\n    text-align: center;\n    pointer-events: none;\n    opacity: 0;\n    transition: opacity 0.15s;\n    z-index: 9999;\n    box-shadow: 0 4px 12px rgba(0,0,0,0.3);\n}\n[data-nr-tooltip]:hover::after {\n    opacity: 1;\n}\n[data-nr-tooltip]::before {\n    content: '';\n    position: absolute;\n    bottom: calc(100% + 1px);\n    left: 50%;\n    transform: translateX(-50%);\n    border: 5px solid transparent;\n    border-top-color: rgba(15,23,42,0.95);\n    pointer-events: none;\n    opacity: 0;\n    transition: opacity 0.15s;\n    z-index: 9999;\n}\n[data-nr-tooltip]:hover::before {\n    opacity: 1;\n}\n</style>\n<script>\n(function() {\n    const MAP = {\n        \"ยืนนิ่ง (Standing)\": \"ยืนนิ่ง 10–15 วินาที (เก็บ 2 ครั้ง)\",\n        \"เดินปกติ (Walking)\": \"เดินปกติ 10–15 วินาที (เก็บ 2 ครั้ง)\",\n        \"วิ่งเบา ๆ (Jogging)\": \"วิ่งเบา ๆ 10–15 วินาที (เก็บ 3 ครั้ง)\",\n        \"นั่งลงปกติ (Sitting)\": \"ยืน → นั่งลงปกติ → ค้าง 3–5 วินาที (เก็บ 2 ครั้ง)\",\n        \"นั่งลงแรง (Hard Sitting)\": \"ยืน → นั่งลงแรง → ค้าง 3–5 วินาที (เก็บ 2 ครั้ง)\",\n        \"ล้มด้านซ้าย (Fall Left)\": \"⚠️ ล้มจำลองไปด้านซ้ายบนเบาะ ค้าง 3–5 วินาที (เก็บ 3 ครั้ง)\",\n        \"ล้มด้านขวา (Fall Right)\": \"⚠️ ล้มจำลองไปด้านขวาบนเบาะ ค้าง 3–5 วินาที (เก็บ 3 ครั้ง)\",\n        \"ล้มไปข้างหน้า (Fall Forward)\": \"⚠️ ล้มจำลองไปข้างหน้าบนเบาะ ค้าง 3–5 วินาที (เก็บ 3 ครั้ง)\",\n        \"ล้มไปข้างหลัง (Fall Backward)\": \"⚠️ ล้มจำลองไปข้างหลังบนเบาะ ค้าง 3–5 วินาที (เก็บ 3 ครั้ง)\"\n    };\n    function applyTooltips() {\n        document.querySelectorAll('.nrdb-ui-button button, button.nrdb-ui-button, button.v-btn').forEach(function(btn) {\n            const label = btn.textContent.trim();\n            if (MAP[label] && !btn.getAttribute('data-nr-tooltip')) {\n                btn.setAttribute('data-nr-tooltip', MAP[label]);\n            }\n        });\n    }\n    // รัน 1 ครั้งหลัง mount และ observe DOM changes\n    setTimeout(applyTooltips, 800);\n    const obs = new MutationObserver(applyTooltips);\n    obs.observe(document.body, { childList: true, subtree: true });\n})();\n</script>\n</template>",
+    "storeOutMessages": true,
+    "passthru": true,
+    "resendOnRefresh": true,
+    "templateScope": "page:style",
+    "className": "",
+    "x": 900,
+    "y": 940,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "ui_notify_session",
+    "type": "ui-notification",
+    "z": "tab_fall_sensor_lab",
+    "ui": "ui_base_334",
+    "position": "bottom right",
+    "displayTime": 3,
+    "showCountdown": true,
+    "outputs": 0,
+    "color": "",
+    "textColor": "",
+    "icon": "info",
+    "name": "Notify Session Success",
+    "x": 700,
+    "y": 200,
+    "wires": []
+  },
+  {
+    "id": "fn_reset_form",
+    "type": "change",
+    "z": "tab_fall_sensor_lab",
+    "name": "Reset Form",
+    "rules": [
+      {
+        "t": "set",
+        "p": "reset",
+        "pt": "msg",
+        "to": "true",
+        "tot": "bool"
+      }
+    ],
+    "action": "",
+    "property": "",
+    "from": "",
+    "to": "",
+    "reg": false,
+    "x": 650,
+    "y": 1540,
+    "wires": [
+      [
+        "ui_session"
+      ]
+    ]
+  }
+]

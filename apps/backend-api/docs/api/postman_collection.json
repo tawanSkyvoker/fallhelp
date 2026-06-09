@@ -1,0 +1,797 @@
+{
+  "info": {
+    "name": "FallHelp API",
+    "_postman_id": "c2e9c9f0-0b5d-4d6d-9c3d-fallhelp123456",
+    "description": "Canonical Postman collection for FallHelp backend. Mirrors the current Express routes, request payloads, and response wrappers.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api" },
+    { "key": "authToken", "value": "" },
+    { "key": "userId", "value": "USER_ID_SAMPLE" },
+    { "key": "elderId", "value": "ELDER_ID_SAMPLE" },
+    { "key": "deviceId", "value": "DEVICE_ID_SAMPLE" },
+    { "key": "deviceCode", "value": "AB12CD34" },
+    { "key": "eventId", "value": "EVENT_ID_SAMPLE" },
+    { "key": "contactId", "value": "CONTACT_ID_SAMPLE" },
+    { "key": "notificationId", "value": "NOTIFICATION_ID_SAMPLE" },
+    { "key": "feedbackId", "value": "FEEDBACK_ID_SAMPLE" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /auth/register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Somchai\",\n  \"lastName\": \"Jaidee\",\n  \"gender\": \"MALE\",\n  \"phone\": \"0812345678\",\n  \"email\": \"somchai@example.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"somchai@example.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('login status is success', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "var json = {};",
+                  "try {",
+                  "  json = pm.response.json();",
+                  "} catch (error) {",
+                  "  console.warn('Login response is not JSON', error);",
+                  "}",
+                  "",
+                  "var token = json && json.data && json.data.token;",
+                  "if (token) {",
+                  "  pm.collectionVariables.set('authToken', token);",
+                  "}",
+                  "",
+                  "var user = json && json.data && json.data.user;",
+                  "if (user && user.id) {",
+                  "  pm.collectionVariables.set('userId', user.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "POST /auth/request-otp",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"somchai@example.com\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/auth/request-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "request-otp"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/verify-otp",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"somchai@example.com\",\n  \"code\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "verify-otp"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/reset-password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"somchai@example.com\",\n  \"code\": \"123456\",\n  \"newPassword\": \"NewPassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "reset-password"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/logout",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "GET /users/me",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /users/me",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Somchai\",\n  \"lastName\": \"Jaidee\",\n  \"phone\": \"0812345678\",\n  \"email\": \"somchai@example.com\",\n  \"gender\": \"MALE\",\n  \"profileImage\": \"https://example.com/uploads/profiles/sample.webp\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /users/me/password",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"Password123!\",\n  \"newPassword\": \"NewPassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/me/password",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me", "password"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /users/me/push-token",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"pushToken\": \"ExponentPushToken[xxxx]\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/users/me/push-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me", "push-token"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /users/me/elders",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/users/me/elders",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me", "elders"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Elders",
+      "item": [
+        {
+          "name": "POST /elders",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Mae\",\n  \"lastName\": \"Thongdee\",\n  \"gender\": \"FEMALE\",\n  \"dateOfBirth\": \"1940-01-01\",\n  \"height\": 160,\n  \"weight\": 55,\n  \"diseases\": \"Hypertension\",\n  \"houseNumber\": \"123\",\n  \"villageNumber\": \"2\",\n  \"villageName\": \"Happy Village\",\n  \"subdistrict\": \"Nai Mueang\",\n  \"district\": \"Mueang\",\n  \"province\": \"Ubon Ratchathani\",\n  \"zipcode\": \"34000\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/elders", "host": ["{{baseUrl}}"], "path": ["elders"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('create elder status is success', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "var json = {};",
+                  "try {",
+                  "  json = pm.response.json();",
+                  "} catch (error) {",
+                  "  console.warn('Create elder response is not JSON', error);",
+                  "}",
+                  "",
+                  "var elder = json && json.data;",
+                  "if (elder && elder.id) {",
+                  "  pm.collectionVariables.set('elderId', elder.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /elders/current",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/elders/current",
+              "host": ["{{baseUrl}}"],
+              "path": ["elders", "current"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /elders/:id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/elders/{{elderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["elders", "{{elderId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /elders/:id",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weight\": 54,\n  \"diseases\": \"Hypertension, Diabetes\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/elders/{{elderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["elders", "{{elderId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Devices",
+      "item": [
+        {
+          "name": "GET /devices/by-code/:deviceCode",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/devices/by-code/{{deviceCode}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["devices", "by-code", "{{deviceCode}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('device lookup status is success', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "var json = {};",
+                  "try {",
+                  "  json = pm.response.json();",
+                  "} catch (error) {",
+                  "  console.warn('Device lookup response is not JSON', error);",
+                  "}",
+                  "",
+                  "var data = json && json.data;",
+                  "if (data && data.id) {",
+                  "  pm.collectionVariables.set('deviceId', data.id);",
+                  "}",
+                  "if (data && data.deviceCode) {",
+                  "  pm.collectionVariables.set('deviceCode', data.deviceCode);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "PUT /devices/:id/wifi-config",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ssid\": \"HomeWiFi\",\n  \"password\": \"wifi123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/devices/{{deviceId}}/wifi-config",
+              "host": ["{{baseUrl}}"],
+              "path": ["devices", "{{deviceId}}", "wifi-config"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /devices/:id/wifi-config",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/devices/{{deviceId}}/wifi-config",
+              "host": ["{{baseUrl}}"],
+              "path": ["devices", "{{deviceId}}", "wifi-config"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Device Pairings",
+      "item": [
+        {
+          "name": "POST /device-pairings",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deviceCode\": \"{{deviceCode}}\",\n  \"elderId\": \"{{elderId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/device-pairings",
+              "host": ["{{baseUrl}}"],
+              "path": ["device-pairings"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('pair device status is success', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "var json = {};",
+                  "try {",
+                  "  json = pm.response.json();",
+                  "} catch (error) {",
+                  "  console.warn('Pair device response is not JSON', error);",
+                  "}",
+                  "",
+                  "var data = json && json.data;",
+                  "if (data && data.id) {",
+                  "  pm.collectionVariables.set('deviceId', data.id);",
+                  "}",
+                  "if (data && data.deviceCode) {",
+                  "  pm.collectionVariables.set('deviceCode', data.deviceCode);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "DELETE /device-pairings/:deviceId",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/device-pairings/{{deviceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["device-pairings", "{{deviceId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "item": [
+        {
+          "name": "GET /events",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/events?elderId={{elderId}}&page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["events"],
+              "query": [
+                { "key": "elderId", "value": "{{elderId}}" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('events list status is success', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "var json = {};",
+                  "try {",
+                  "  json = pm.response.json();",
+                  "} catch (error) {",
+                  "  console.warn('Events list response is not JSON', error);",
+                  "}",
+                  "",
+                  "var firstEvent = json && json.data && json.data.length ? json.data[0] : null;",
+                  "if (firstEvent && firstEvent.id) {",
+                  "  pm.collectionVariables.set('eventId', firstEvent.id);",
+                  "}",
+                  ""
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /events/recent",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/events/recent?limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "recent"],
+              "query": [{ "key": "limit", "value": "10" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /events/:id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /events/summary/daily",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/events/summary/daily?elderId={{elderId}}&days=7",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "summary", "daily"],
+              "query": [
+                { "key": "elderId", "value": "{{elderId}}" },
+                { "key": "days", "value": "7" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /events/summary/monthly",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/events/summary/monthly?elderId={{elderId}}&year=2026&month=3",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "summary", "monthly"],
+              "query": [
+                { "key": "elderId", "value": "{{elderId}}" },
+                { "key": "year", "value": "2026" },
+                { "key": "month", "value": "3" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Emergency Contacts",
+      "item": [
+        {
+          "name": "POST /elders/:elderId/emergency-contacts",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Narin Jaidee\",\n  \"phone\": \"0890001234\",\n  \"relationship\": \"Son\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/elders/{{elderId}}/emergency-contacts",
+              "host": ["{{baseUrl}}"],
+              "path": ["elders", "{{elderId}}", "emergency-contacts"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /elders/:elderId/emergency-contacts",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/elders/{{elderId}}/emergency-contacts",
+              "host": ["{{baseUrl}}"],
+              "path": ["elders", "{{elderId}}", "emergency-contacts"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /elders/:elderId/emergency-contacts/:contactId",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Narin Jaidee\",\n  \"phone\": \"0890005678\",\n  \"relationship\": \"Brother\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/elders/{{elderId}}/emergency-contacts/{{contactId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["elders", "{{elderId}}", "emergency-contacts", "{{contactId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /elders/:elderId/emergency-contacts/:contactId",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/elders/{{elderId}}/emergency-contacts/{{contactId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["elders", "{{elderId}}", "emergency-contacts", "{{contactId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /elders/:elderId/emergency-contacts/order",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contactIds\": [\"{{contactId}}\", \"CONTACT_ID_SAMPLE_2\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/elders/{{elderId}}/emergency-contacts/order",
+              "host": ["{{baseUrl}}"],
+              "path": ["elders", "{{elderId}}", "emergency-contacts", "order"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "GET /notifications",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/notifications?page=1&pageSize=20&isRead=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" },
+                { "key": "isRead", "value": "false" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('notifications list status is success', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "var json = {};",
+                  "try {",
+                  "  json = pm.response.json();",
+                  "} catch (error) {",
+                  "  console.warn('Notifications response is not JSON', error);",
+                  "}",
+                  "",
+                  "var firstNotification = json && json.data && json.data.length ? json.data[0] : null;",
+                  "if (firstNotification && firstNotification.id) {",
+                  "  pm.collectionVariables.set('notificationId', firstNotification.id);",
+                  "}",
+                  "if (firstNotification && firstNotification.eventId) {",
+                  "  pm.collectionVariables.set('eventId', firstNotification.eventId);",
+                  "}",
+                  ""
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /notifications/unread-count",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/notifications/unread-count",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "unread-count"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /notifications/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"isRead\": true\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{notificationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "{{notificationId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /notifications",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"mark_all_read\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/notifications",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "POST /admin/devices",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"serialNumber\": \"ESP32-6C689BDAF380\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/admin/devices",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "devices"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /admin/devices",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/devices",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "devices"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /admin/devices/:id",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/admin/devices/{{deviceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "devices", "{{deviceId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /admin/devices/:id/unpair",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/admin/devices/{{deviceId}}/unpair",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "devices", "{{deviceId}}", "unpair"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

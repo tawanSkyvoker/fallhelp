@@ -1,0 +1,4 @@
+session_id,trial_id,activity_label,expected_type,timestamp_ms,type,state,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps,svm_raw_g,svm_filtered_g,pitch_deg,roll_deg,pitch_before_deg,roll_before_deg,pitch_after_deg,roll_after_deg,pitch_delta_deg,roll_delta_deg,posture_delta_deg,impact_threshold_g,posture_threshold_deg,stabilize_ms,decision,note
+S01,T04,sit_hard,non_fall,1000,imu_sample,IDLE,0.10,0.05,1.00,0.3,0.2,0.1,1.01,1.01,5.2,3.8,,,,,,,,2.0,45,1500,pending,
+S01,T04,sit_hard,non_fall,1500,imu_impact,IMPACT_DETECTED,1.30,1.45,0.86,6.1,-3.8,0.5,2.14,2.12,6.0,4.2,6.0,4.2,,,,,,2.0,45,1500,pending,
+S01,T04,sit_hard,non_fall,3000,imu_decision,POSTURE_CHECK,0.22,0.30,1.02,1.2,-0.8,0.2,1.08,1.09,10.0,24.0,6.0,4.2,10.0,24.0,4.0,19.8,22.0,2.0,45,1500,ignored,hard sitting on chair

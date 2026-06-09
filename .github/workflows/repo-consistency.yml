@@ -1,0 +1,41 @@
+name: Repo Audit
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "GEMINI.md"
+      - ".github/copilot-instructions.md"
+      - ".github/PULL_REQUEST_TEMPLATE.md"
+      - ".github/agents/**"
+      - ".github/skills/**"
+      - ".github/workflows/repo-consistency.yml"
+      - ".claude/commands/**"
+      - ".agent/skills/**"
+      - ".agents/skills/**"
+      - "docs/ai/**"
+      - "scripts/audit/audit-instruction-drift.mjs"
+
+jobs:
+  audit:
+    name: Instruction Drift Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Audit instruction drift
+        run: node scripts/audit/audit-instruction-drift.mjs

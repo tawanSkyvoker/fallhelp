@@ -1,0 +1,152 @@
+{
+  "name": "backend-api",
+  "projectType": "application",
+  "sourceRoot": "apps/backend-api/src",
+  "tags": ["scope:backend", "type:app", "runtime:node"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-script",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "script": "build"
+      },
+      "metadata": {
+        "description": "Build the backend API"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "typecheck"
+      },
+      "metadata": {
+        "description": "Typecheck backend source and backend-local scripts"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "lint"
+      },
+      "metadata": {
+        "description": "Lint backend source and backend-local scripts"
+      }
+    },
+    "test": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "test:ci"
+      },
+      "metadata": {
+        "description": "Run backend unit tests in CI-safe mode"
+      }
+    },
+    "test-integration": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "test:integration"
+      },
+      "metadata": {
+        "description": "Run backend integration tests"
+      }
+    },
+    "dev": {
+      "executor": "nx:run-script",
+      "continuous": true,
+      "options": {
+        "script": "dev"
+      },
+      "metadata": {
+        "description": "Start backend dev server with watch mode"
+      }
+    },
+    "debug": {
+      "executor": "nx:run-script",
+      "continuous": true,
+      "options": {
+        "script": "debug"
+      },
+      "metadata": {
+        "description": "Start backend dev server with DEBUG namespace enabled"
+      }
+    },
+    "start": {
+      "executor": "nx:run-script",
+      "continuous": true,
+      "options": {
+        "script": "start"
+      },
+      "metadata": {
+        "description": "Start built backend server"
+      }
+    },
+    "db-verify": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "db:verify"
+      },
+      "metadata": {
+        "description": "Verify PostgreSQL schema objects required by runtime"
+      }
+    },
+    "db-test-setup": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "db:test:setup"
+      },
+      "metadata": {
+        "description": "Create or recreate the integration test database schema"
+      }
+    },
+    "infra-scan": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/audit/infra-scan.mjs",
+        "cwd": "."
+      },
+      "metadata": {
+        "description": "Run infrastructure consistency scan (runtime, docs, env)"
+      }
+    },
+    "infra-scan-strict": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/audit/infra-scan.mjs --strict",
+        "cwd": "."
+      },
+      "metadata": {
+        "description": "Run strict infrastructure consistency scan (includes lint, typecheck, integration tests)"
+      }
+    },
+    "audit-instructions": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/audit/audit-instruction-drift.mjs",
+        "cwd": "."
+      },
+      "metadata": {
+        "description": "Check for instruction drift in AI-related files"
+      }
+    },
+    "audit-comments": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/audit/audit-comments.mjs",
+        "cwd": "."
+      },
+      "metadata": {
+        "description": "Audit Thai-first commenting standards"
+      }
+    },
+    "sim-fall": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npm run sim:fall",
+        "cwd": "apps/backend-api"
+      },
+      "metadata": {
+        "description": "Simulate a fall event via MQTT"
+      }
+    }
+  }
+}

@@ -1,0 +1,32 @@
+# Build output
+dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+
+# Coverage
+coverage/
+
+# Prisma generated files
+src/generated/
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Secrets
+*.pem
+*.key
+firebase-adminsdk.json
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/

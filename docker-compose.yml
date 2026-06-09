@@ -1,0 +1,92 @@
+name: fallhelp
+
+services:
+  # ==================== Backend API ====================
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend-api/Dockerfile
+    container_name: fallhelp-api
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      DATABASE_URL: "${DATABASE_URL_DOCKER}"
+      MQTT_BROKER_URL: "${MQTT_BROKER_URL_DOCKER:-mqtt://host.docker.internal:1883}"
+      MQTT_USERNAME: "${MQTT_USERNAME}"
+      MQTT_PASSWORD: "${MQTT_PASSWORD}"
+      JWT_SECRET: "${JWT_SECRET}"
+      ENCRYPTION_KEY: "${ENCRYPTION_KEY}"
+      PORT: "3000"
+      NODE_ENV: "development"
+      JWT_EXPIRES_IN: "15d"
+      FRONTEND_URL: "${FRONTEND_URL}"
+      ADMIN_URL: "${ADMIN_URL}"
+      TUNNEL_PUBLIC_HOSTNAME: "${TUNNEL_PUBLIC_HOSTNAME}"
+      RESEND_API_KEY: "${RESEND_API_KEY}"
+      EMAIL_FROM: "${EMAIL_FROM}"
+      DISABLE_EMAIL: "${DISABLE_EMAIL:-false}"
+      DEBUG: "fallhelp:*"
+    ports:
+      - "3000:3000"
+
+  # ==================== Admin Panel ====================
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        VITE_API_URL: "${ADMIN_VITE_API_URL:-http://localhost:3000/api}"
+    container_name: fallhelp-admin
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+  # ==================== Cloudflare Tunnel ====================
+  # Named Tunnel จาก Cloudflare Dashboard (เช่น DNS api -> fallhelp-backend)
+  # ต้องตั้ง TUNNEL_TOKEN ใน .env จริง แล้วรัน `docker compose --env-file apps/backend-api/.env --profile tunnel up`
+  # Public hostname อยู่ใน TUNNEL_PUBLIC_HOSTNAME เพื่อให้ mobile/admin ใช้ URL เดียวกับ Cloudflare
+  # Origin URL ต้องเป็น service ใน Docker network เช่น http://backend:3000 ไม่ใช่ localhost
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: fallhelp-tunnel
+    profiles:
+      - tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url ${TUNNEL_ORIGIN_URL:-http://backend:3000} run
+    environment:
+      TUNNEL_TOKEN: "${TUNNEL_TOKEN:-}"
+      TUNNEL_PUBLIC_HOSTNAME: "${TUNNEL_PUBLIC_HOSTNAME}"
+      TUNNEL_ORIGIN_URL: "${TUNNEL_ORIGIN_URL:-http://backend:3000}"
+    depends_on:
+      - backend
+
+  # ==================== Node-RED (Sensor Lab) ====================
+  # Fall Detection Sensor Lab IMU data collection flow with FlowFuse Dashboard 2.0
+  # Start with: docker compose --profile lab up node-red
+  # Dashboard UI: http://localhost:1880/ui
+  node-red:
+    build:
+      context: .
+      dockerfile: firmware/esp32/fall_detection_sensor_lab/node-red/Dockerfile
+    container_name: fallhelp-nodered
+    restart: unless-stopped
+    profiles:
+      - lab
+    ports:
+      - "${NODE_RED_PORT:-1880}:1880"
+    environment:
+      MQTT_BROKER_HOST: "${MQTT_BROKER_HOST:-host.docker.internal}"
+      MQTT_BROKER_PORT: "${MQTT_BROKER_PORT:-1883}"
+      MQTT_USE_TLS: "${MQTT_USE_TLS:-false}"
+      MQTT_USERNAME: "${MQTT_USERNAME:-}"
+      MQTT_PASSWORD: "${MQTT_PASSWORD:-}"
+      # Absolute path so the flow writes CSV files to the mounted runs folder.
+      SENSOR_LAB_RUNS_DIR: "/data/runs"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./firmware/esp32/fall_detection_sensor_lab/node-red/runtime:/data
+      - ./firmware/esp32/fall_detection_sensor_lab/runs:/data/runs

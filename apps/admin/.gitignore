@@ -1,0 +1,22 @@
+# Build output
+dist/
+dist-ssr/
+
+# Environment
+.env*
+!.env.example
+
+# Logs
+*.log
+
+# Coverage
+coverage/
+
+# Secrets
+*.pem
+*.key
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/

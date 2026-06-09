@@ -1,0 +1,96 @@
+{
+  "expo": {
+    "name": "FallHelp",
+    "slug": "fallhelp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/logoicon.png",
+    "scheme": "mobile",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/logoicon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fallhelp.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIViewControllerBasedStatusBarAppearance": true
+      }
+    },
+    "androidStatusBar": {
+      "barStyle": "dark-content",
+      "backgroundColor": "#00000000",
+      "translucent": true
+    },
+
+    "android": {
+      "package": "com.fallhelp.mobile",
+      "softwareKeyboardLayoutMode": "resize",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/logoicon-adaptive.png",
+        "backgroundColor": "#ffffff"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_ADVERTISE"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/logoicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/logoicon.png",
+          "color": "#ffffff",
+          "defaultChannel": "default",
+          "sounds": []
+        }
+      ],
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "ใช้กล้องเพื่อสแกน QR Code เพื่อเชื่อมต่ออุปกรณ์"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "เข้าถึงรูปภาพเพื่อเลือกรูปโปรไฟล์"
+        }
+      ],
+      [
+        "react-native-ble-manager",
+        {
+          "bluetoothAlwaysUsageDescription": "ใช้ Bluetooth เพื่อค้นหาและเชื่อมต่อกับอุปกรณ์ตรวจจับการหกล้ม",
+          "bluetoothPeripheralUsageDescription": "ใช้ Bluetooth เพื่อค้นหาและเชื่อมต่อกับอุปกรณ์ตรวจจับการหกล้ม",
+          "companionDevice": true
+        }
+      ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ce44a92a-4740-4463-aa60-8afd3b3baa21"
+      }
+    },
+    "experiments": {
+      "typedRoutes": true
+    },
+    "owner": "tawanboy"
+  }
+}

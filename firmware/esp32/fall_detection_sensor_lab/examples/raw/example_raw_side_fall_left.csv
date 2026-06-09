@@ -1,0 +1,4 @@
+session_id,trial_id,activity_label,expected_type,timestamp_ms,type,state,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps,svm_raw_g,svm_filtered_g,pitch_deg,roll_deg,pitch_before_deg,roll_before_deg,pitch_after_deg,roll_after_deg,pitch_delta_deg,roll_delta_deg,posture_delta_deg,impact_threshold_g,posture_threshold_deg,stabilize_ms,decision,note
+S01,T05,side_fall_left,fall,1000,imu_sample,IDLE,0.12,0.08,0.98,0.5,0.4,0.1,0.99,1.01,6.8,4.5,,,,,,,,2.0,45,1500,pending,
+S01,T05,side_fall_left,fall,1700,imu_impact,IMPACT_DETECTED,1.42,1.66,0.88,12.4,-8.1,1.2,2.35,2.31,7.5,4.8,7.5,4.8,,,,,,2.0,45,1500,pending,
+S01,T05,side_fall_left,fall,3200,imu_decision,POSTURE_CHECK,0.40,0.82,1.05,2.1,-1.5,0.3,1.39,1.22,19.2,63.0,7.5,4.8,19.2,63.0,11.7,58.2,58.2,2.0,45,1500,suspected_fall,fall on mattress
